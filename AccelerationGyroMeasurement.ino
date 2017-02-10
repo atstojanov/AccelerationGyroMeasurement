@@ -126,6 +126,10 @@ void loop() {
 
   read_mpu_6050_data();
 
+  gx -= gyro_x_cal;                                                //Subtract the offset calibration value from the raw gyro_x value
+  gy -= gyro_y_cal;                                                //Subtract the offset calibration value from the raw gyro_y value
+  gz -= gyro_z_cal;                                                //Subtract the offset calibration value from the raw gyro_z value
+
   compare(ax, &maxax);
   compare(ay, &maxay);
   compare(az, &maxaz);
