@@ -45,9 +45,14 @@ float angle_pitch_output, angle_roll_output;
 #define LED_PIN 13
 
 #define DSP_V_POS_ACC 0
-#define DSP_V_POS_GYRO 64
+#define DSP_V_POS_GYRO 56
 #define ROW_HIGH 8
 #define DSP_V_DATA_OFFSET 12
+
+#define FONT_WIDTH 6
+#define FONT_HEIGHT 8
+#define DISPLAY_WIDTH_PIXELS 128
+#define DISPLAY_HEIGHT_PIXELS 64
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
@@ -261,19 +266,19 @@ void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t
 {
   display.print("Acc", DSP_V_POS_ACC, ROW_HIGH);
   display.print("x=", DSP_V_POS_ACC, ROW_HIGH * 2);
-  display.printNumF(convertAcc(_ax), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, ROW_HIGH * 2);
+  display.printNumF(convertAcc(_ax), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 2);
   display.print("y=", DSP_V_POS_ACC, ROW_HIGH * 3);
-  display.printNumF(convertAcc(_ay), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, ROW_HIGH * 3);
+  display.printNumF(convertAcc(_ay), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 3);
   display.print("z=", DSP_V_POS_ACC, ROW_HIGH * 4);
-  display.printNumF(convertAcc(_az), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, ROW_HIGH * 4);
+  display.printNumF(convertAcc(_az), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 4);
 
-  display.print("Gyro", DSP_V_POS_GYRO, ROW_HIGH);
-  display.print("x=", DSP_V_POS_GYRO, ROW_HIGH * 2);
-  display.printNumF(convertGyro(_gx), 2, DSP_V_POS_GYRO + DSP_V_DATA_OFFSET, ROW_HIGH * 2);
-  display.print("y=", DSP_V_POS_GYRO, ROW_HIGH * 3);
-  display.printNumF(convertGyro(_gy), 2, DSP_V_POS_GYRO + DSP_V_DATA_OFFSET, ROW_HIGH * 3);
-  display.print("z=", DSP_V_POS_GYRO, ROW_HIGH * 4);
-  display.printNumF(convertGyro(_gz), 2, DSP_V_POS_GYRO + DSP_V_DATA_OFFSET, ROW_HIGH * 4);
+  display.print("Angles", DSP_V_POS_GYRO, ROW_HIGH);
+  display.print("pitch=", DSP_V_POS_GYRO, ROW_HIGH * 2);
+  display.printNumF(convertGyro(_gx), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6) , FONT_HEIGHT * 2);
+  display.print("roll=", DSP_V_POS_GYRO, ROW_HIGH * 3);
+  display.printNumF(convertGyro(_gy), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 3);
+  display.print("yaw=", DSP_V_POS_GYRO, ROW_HIGH * 4);
+  display.printNumF(convertGyro(_gz), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 4);
 }
 
 void displayButtons()
@@ -316,22 +321,22 @@ void refresh() {
 
   displayButtons();
 
-  display.print("+/-", DSP_V_POS_ACC, ROW_HIGH * 5);
-  display.printNumI(int_pow(2, (accRange + 1)), DSP_V_POS_ACC + 18, ROW_HIGH * 5, 2);
-  display.print("+/-", DSP_V_POS_GYRO, ROW_HIGH * 5);
-  display.printNumI(250 * (gyroRange + 1), DSP_V_POS_GYRO + 18, ROW_HIGH * 5, 4);
+//  display.print("+/-", DSP_V_POS_ACC, ROW_HIGH * 5);
+//  display.printNumI(int_pow(2, (accRange + 1)), DSP_V_POS_ACC + 18, ROW_HIGH * 5, 2);
+//  display.print("+/-", DSP_V_POS_GYRO, ROW_HIGH * 5);
+//  display.printNumI(250 * (gyroRange + 1), DSP_V_POS_GYRO + 18, ROW_HIGH * 5, 4);
 
   switch (menuPosition)
   {
     case MENU_HOME:
       displayReadings(ax, ay, az, gx, gy, gz);
-      display.print("Current values:", 0, 0);
-      display.print("Max", 33, 63 - 8);
+      display.print("MPU6050", CENTER, 0);
+      display.print("Mode", 33, 63 - 8);
       break;
     case MENU_HOME_MAX:
       displayReadings(maxax, maxay, maxaz, maxgx, maxgy, maxgz);
-      display.print("Max values:", 0, 0);
-      display.print("Curr", 33, 63 - 8);
+      display.print("ADXL345", CENTER, 0);
+      display.print("Mode", 33, 63 - 8);
       break;
   }
   display.update();
