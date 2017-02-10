@@ -29,16 +29,15 @@ int displayInterval = 500;
 OLED display(SDA, SCL, 10);
 extern uint8_t SmallFont[];
 
-int16_t ax, ay, az, maxax, maxay, maxaz;
+long ax, ay, az, maxax, maxay, maxaz, acc_total_vector;
 int16_t gx, gy, gz, maxgx, maxgy, maxgz;
 int16_t temperature;
-int16_t gyro_x_cal, gyro_y_cal, gyro_z_cal;
-int16_t loop_timer;
-int16_t lcd_loop_counter;
-float angle_pitch, angle_roll;
-int16_t angle_pitch_buffer, angle_roll_buffer;
+long gyro_x_cal, gyro_y_cal, gyro_z_cal;
+long loop_timer;
+float angle_pitch, angle_roll, angle_yaw;
+long angle_pitch_buffer, angle_roll_buffer, angle_yaw_buffer;
 boolean set_gyro_angles;
-float angle_roll_acc, angle_pitch_acc;
+float angle_roll_acc, angle_pitch_acc, angle_yaw_acc;
 float angle_pitch_output, angle_roll_output;
 
 #define INTERRUPT_PIN 2
@@ -127,6 +126,8 @@ void loop() {
       break;
   }
 
+
+
 //  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
   read_mpu_6050_data();
@@ -135,14 +136,16 @@ void loop() {
   gy -= gyro_y_cal;                                                //Subtract the offset calibration value from the raw gyro_y value
   gz -= gyro_z_cal;                                                //Subtract the offset calibration value from the raw gyro_z value
 
-  compare(ax, &maxax);
-  compare(ay, &maxay);
-  compare(az, &maxaz);
-  compare(gx, &maxgx);
-  compare(gy, &maxgy);
-  compare(gz, &maxgz);
+//  compare(ax, &maxax);
+//  compare(ay, &maxay);
+//  compare(az, &maxaz);
+//  compare(gx, &maxgx);
+//  compare(gy, &maxgy);
+//  compare(gz, &maxgz);
+//
+//  checkRange();
 
-  checkRange();
+  calculateAngles();
 
   refresh();
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));;
@@ -273,12 +276,12 @@ void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t
   display.printNumF(convertAcc(_az), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 5);
 
   display.print("Angles", DSP_V_POS_GYRO, FONT_HEIGHT * 2);
-  display.print("pitch=", DSP_V_POS_GYRO, FONT_HEIGHT * 3);
-  display.printNumF(convertGyro(_gx), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6) , FONT_HEIGHT * 3);
-  display.print("roll=", DSP_V_POS_GYRO, FONT_HEIGHT * 4);
-  display.printNumF(convertGyro(_gy), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 4);
+  display.print("roll=", DSP_V_POS_GYRO, FONT_HEIGHT * 3);
+  display.printNumF(angle_roll, 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6) , FONT_HEIGHT * 3);
+  display.print("pitch=", DSP_V_POS_GYRO, FONT_HEIGHT * 4);
+  display.printNumF(angle_pitch, 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 4);
   display.print("yaw=", DSP_V_POS_GYRO, FONT_HEIGHT * 5);
-  display.printNumF(convertGyro(_gz), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 5);
+  display.printNumF(angle_yaw, 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 5);
 }
 
 void displayButtons()
@@ -351,3 +354,17 @@ double convertGyro(int16_t value) {
   return (value / 32768.00) * 250 * (gyroRange + 1);
 }
 
+
+void calculateAngles()
+{
+  //Accelerometer angle calculations
+  acc_total_vector = sqrt((ax*ax)+(ay*ay)+(az*az));  //Calculate the total accelerometer vector
+  //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
+  angle_pitch_acc = asin((float)ax/acc_total_vector)* 57.296;       //Calculate the pitch angle
+  angle_roll_acc = asin((float)ay/acc_total_vector)* -57.296;       //Calculate the roll angle
+  angle_yaw_acc = asin((float)az/acc_total_vector)* 57.296;       //Calculate the yaw angle
+
+  angle_pitch = angle_pitch_acc;
+  angle_roll = angle_roll_acc;
+  angle_yaw = angle_yaw_acc;
+}
