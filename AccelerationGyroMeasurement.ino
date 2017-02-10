@@ -264,21 +264,21 @@ int16_t int_pow(int16_t base, int16_t exp)
 }
 void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t _gy, int16_t _gz)
 {
-  display.print("Acc", DSP_V_POS_ACC, ROW_HIGH);
-  display.print("x=", DSP_V_POS_ACC, ROW_HIGH * 2);
-  display.printNumF(convertAcc(_ax), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 2);
-  display.print("y=", DSP_V_POS_ACC, ROW_HIGH * 3);
-  display.printNumF(convertAcc(_ay), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 3);
-  display.print("z=", DSP_V_POS_ACC, ROW_HIGH * 4);
-  display.printNumF(convertAcc(_az), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 4);
+  display.print("Acc", DSP_V_POS_ACC, FONT_HEIGHT *2);
+  display.print("x=", DSP_V_POS_ACC, FONT_HEIGHT * 3);
+  display.printNumF(convertAcc(_ax), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 3);
+  display.print("y=", DSP_V_POS_ACC, FONT_HEIGHT * 4);
+  display.printNumF(convertAcc(_ay), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 4);
+  display.print("z=", DSP_V_POS_ACC, FONT_HEIGHT * 5);
+  display.printNumF(convertAcc(_az), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 5);
 
-  display.print("Angles", DSP_V_POS_GYRO, ROW_HIGH);
-  display.print("pitch=", DSP_V_POS_GYRO, ROW_HIGH * 2);
-  display.printNumF(convertGyro(_gx), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6) , FONT_HEIGHT * 2);
-  display.print("roll=", DSP_V_POS_GYRO, ROW_HIGH * 3);
-  display.printNumF(convertGyro(_gy), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 3);
-  display.print("yaw=", DSP_V_POS_GYRO, ROW_HIGH * 4);
-  display.printNumF(convertGyro(_gz), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 4);
+  display.print("Angles", DSP_V_POS_GYRO, FONT_HEIGHT * 2);
+  display.print("pitch=", DSP_V_POS_GYRO, FONT_HEIGHT * 3);
+  display.printNumF(convertGyro(_gx), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6) , FONT_HEIGHT * 3);
+  display.print("roll=", DSP_V_POS_GYRO, FONT_HEIGHT * 4);
+  display.printNumF(convertGyro(_gy), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 4);
+  display.print("yaw=", DSP_V_POS_GYRO, FONT_HEIGHT * 5);
+  display.printNumF(convertGyro(_gz), 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 5);
 }
 
 void displayButtons()
