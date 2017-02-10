@@ -1,6 +1,6 @@
-#include "Wire.h"
+//#include "Wire.h"
 #include "Keypad.h"
-#include "OLED_I2C.h"
+//#include "OLED_I2C.h"
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
@@ -23,10 +23,38 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 
 void setup()
 {
+  Serial.begin(38400);
+  Serial.println("Setting some things up.");
+
+  keypad.addEventListener(keypadEvent);
+
+  Serial.println("Done");
 
 }
 
 void loop() {
-  
+    
+  char key = keypad.getKey();
+  if (key) {
+//    Serial.println(key);
+  }
 }
 
+void keypadEvent(KeypadEvent key) {
+  switch (keypad.getState()) {
+    
+    case PRESSED:
+      Serial.print(key);
+      Serial.println(" - PRESSED");
+      break;
+    case RELEASED:
+      Serial.print(key);
+      Serial.println(" - RELEASED");
+      break;
+
+    case HOLD:
+      Serial.print(key);
+      Serial.println(" - HOLD");
+      break;
+  }
+}
