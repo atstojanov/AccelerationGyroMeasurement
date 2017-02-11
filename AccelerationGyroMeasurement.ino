@@ -2,7 +2,6 @@
 #include "Keypad.h"
 #include "OLED_I2C.h"
 #include <MsTimer2.h>
-#include "helper_3dmath.h"
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
@@ -77,7 +76,7 @@ long ax, ay, az, maxax, maxay, maxaz;
 long gx, gy, gz, maxgx, maxgy, maxgz;
 long temperature;
 long gyro_x_cal, gyro_y_cal, gyro_z_cal;
-long loop_timer;
+long loopTimer;
 float angle_pitch, angle_roll, angle_yaw;
 long angle_pitch_buffer, angle_roll_buffer, angle_yaw_buffer;
 float angle_roll_acc, angle_pitch_acc, angle_yaw_acc;
@@ -116,6 +115,7 @@ void setup()
   // calibrateGyro();
 
   Serial.println("Done");
+  loopTimer = micros();
 }
 
 void loop()
@@ -156,7 +156,8 @@ void loop()
 
   refresh();
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  ;
+  while(micros() - loopTimer < 4000);                                 //Wait until the loopTimer reaches 4000us (250Hz) before starting the next loop
+  loopTimer = micros();                                               //Reset the loop timer
 }
 
 void read_mpu_6050_data()
@@ -398,27 +399,18 @@ double gyroReadingsToDegree(int16_t value)
 void calculateAngles()
 {
   acc_total_vector = sqrt((ax * ax) + (ay * ay) + (az * az)); //Calculate the total accelerometer vector
-  // Serial.print("\t");
-  // Serial.print(ax);
-  // Serial.print("\t");
-  // Serial.print(ay);
-  // Serial.print("\t");
-  // Serial.println(az);
-  Serial.println(rawToRealGyro(gx));
-
-  Serial.println(acc_total_vector);
   //The Arduino asin function is in radians
   angle_pitch += gyroReadingsToDegree(gx);
   angle_roll += gyroReadingsToDegree(gy);
 
-  angle_pitch_acc = asin((float)ax / acc_total_vector) * 180.0 / M_PI; //Calculate the pitch angle
-  angle_roll_acc = asin((float)ay / acc_total_vector) * 180.0 / M_PI;  //Calculate the roll angle
+  angle_pitch_acc = asin((float)ax / acc_total_vector) * RAD_TO_DEG; //Calculate the pitch angle
+  angle_roll_acc = -1 * asin((float)ay / acc_total_vector) * RAD_TO_DEG;  //Calculate the roll angle
   
 
   if (setGyroAngles)
   {
-      angle_pitch = angle_pitch * 0.995 + angle_pitch_acc * 0.005;
-      angle_roll = angle_roll * 0.995 + angle_roll_acc * 0.005;
+      angle_pitch = angle_pitch * 0.9995 + angle_pitch_acc * 0.0005;
+      angle_roll = angle_roll * 0.9995 + angle_roll_acc * 0.0005;
   }
   else
   {
