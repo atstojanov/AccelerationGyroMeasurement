@@ -109,12 +109,16 @@ void setup()
   // конфигуриране на LED пина, като изход.
   pinMode(LED_PIN, OUTPUT);
 
-  //Конфигуриране на mpu_6050.
+  //Конфигуриране на MPU6050.
   setupMPU6050();
+  
+  //Конфигуриране на ADXL345.
+  setupADXL345();
 
-  //Калибриране на сензора.
+  //Калибриране на сензорите.
   calibrate();
 
+  //Конфигуриране на клавиатурата
   keypad.addEventListener(keypadEvent);
   keypad.setHoldTime(1000);
 
@@ -130,48 +134,26 @@ void setup()
 
 void loop()
 {
+  // Прочита се състоянието на бутоните
   readButtons();
+  // Отработва се състояниет на бутоните, ако има натиснат или задържан бутон
   processButtons();
-  readMPU6050();
+  // чете се сензора 
+  readSensor();
+  // Конвертиране на данните от чист вид в удобен за ползавне
+  // От акселерометъра в g.
+  // От жироскопа в градуси за секунда (deg/s).
   rawToReal();
+  // Изчислява се наклона на устройството.
   getEstimatedInclination();
-
-  // Serial.print(interval);  //microseconds since last sample, monitor this value to be < 10000, increase bitrate to print faster
-  // Serial.print(",");
-  // Serial.print(realAcc[0]);  //Inclination X axis (as measured by accelerometer)
-  // Serial.print(",");
-  // Serial.print(RwAcc[0]);  //Inclination X axis (estimated / filtered)
-  // Serial.print(",");
-  // Serial.print(realAcc[1]);  //Inclination Y axis (as measured by accelerometer)
-  // Serial.print(",");
-  // Serial.print(RwAcc[1]);  //Inclination Y axis (estimated / filtered)
-  // Serial.print(",");
-  // Serial.print(realAcc[2]);  //Inclination Z axis (as measured by accelerometer)
-  // Serial.print(",");
-  // Serial.print(RwAcc[2]);  //Inclination Z axis (estimated / filtered)
-  // Serial.println("");
-
-  // buttonPressed = keypad.getKey();
-  // switch (buttonPressed)
-  // {
-  // case BUTTON_1:
-  //   reset();
-  //   break;
-  // case BUTTON_3:
-  //   if (menuPosition == MENU_HOME)
-  //     menuPosition = MENU_HOME_MAX;
-  //   else
-  //     menuPosition = MENU_HOME;
-  //   break;
-  // }
-
-  // gx -= gyroOffsetX; //Subtract the offset calibration value from the raw gyro_x value
-  // gy -= gyroOffsetY; //Subtract the offset calibration value from the raw gyro_y value
-  // gz -= gyroOffsetZ; //Subtract the offset calibration value from the raw gyro_z value
-
-  // calculateAngles();
-
+  
+  // Опреснява се информацията на дисплея
   updateDisplay();
+
+  // Изпращт се данни през серийния интерфейс към PC.
+  sendData();
+
+  // Променя се състоянието на индикиращия LED. Той служи като индикация, че програмата не е спряла.
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
@@ -246,7 +228,7 @@ void getEstimatedInclination()
     normalize3DVector(RwEst);
   }
 
-  // Преизчисляване на ъглите след променените стойности, за визуализация
+  // Преизчисляване на ъглите след променените стойности, за визуализация.
   for (w = 0; w <= 1; w++)
   {
     Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG;
