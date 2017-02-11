@@ -8,37 +8,6 @@
 #define BUTTON_3 '3'
 #define BUTTON_4 '4'
 
-//
-#define LED_PIN 13
-
-const byte ROWS = 2; //Два реда
-const byte COLS = 2; //Две колони
-
-char keys[ROWS][COLS] = {
-    {'4', '3'},
-    {'2', '1'}};
-
-byte rowPins[ROWS] = {4, 5}; //пинове към които са свързани редовете на клавиатурата
-byte colPins[COLS] = {6, 7}; //пинове към които са свързани колоните на клавиатурата
-
-Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
-
-int displayInterval = 500;
-
-OLED display(SDA, SCL, 10);
-extern uint8_t SmallFont[];
-
-long ax, ay, az, maxax, maxay, maxaz, acc_total_vector;
-int16_t gx, gy, gz, maxgx, maxgy, maxgz;
-int16_t temperature;
-long gyro_x_cal, gyro_y_cal, gyro_z_cal;
-long loop_timer;
-float angle_pitch, angle_roll, angle_yaw;
-long angle_pitch_buffer, angle_roll_buffer, angle_yaw_buffer;
-boolean set_gyro_angles;
-float angle_roll_acc, angle_pitch_acc, angle_yaw_acc;
-float angle_pitch_output, angle_roll_output;
-
 #define INTERRUPT_PIN 2
 #define LED_PIN 13
 
@@ -77,6 +46,41 @@ float angle_pitch_output, angle_roll_output;
 
 #define UPPER_RANGE 24576  // 75% of int16_t
 #define BOTTOM_RANGE 16384 // 50% of int16_t
+
+//
+#define LED_PIN 13
+
+const byte ROWS = 2; //Два реда
+const byte COLS = 2; //Две колони
+
+char keys[ROWS][COLS] = {
+    {'4', '3'},
+    {'2', '1'}};
+
+byte rowPins[ROWS] = {4, 5}; //пинове към които са свързани редовете на клавиатурата
+byte colPins[COLS] = {6, 7}; //пинове към които са свързани колоните на клавиатурата
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+int displayInterval = 500;
+
+OLED display(SDA, SCL, 10);
+extern uint8_t SmallFont[];
+
+VectorInt16 acc;
+
+logn acc_total_vector;
+
+int16_t raw_ax, raw_ay, raw_az, maxax, maxay, maxaz;
+int16_t gx, gy, gz, maxgx, maxgy, maxgz;
+int16_t temperature;
+long gyro_x_cal, gyro_y_cal, gyro_z_cal;
+long loop_timer;
+float angle_pitch, angle_roll, angle_yaw;
+long angle_pitch_buffer, angle_roll_buffer, angle_yaw_buffer;
+boolean set_gyro_angles;
+float angle_roll_acc, angle_pitch_acc, angle_yaw_acc;
+float angle_pitch_output, angle_roll_output;
 
 volatile bool refreshNeeded = false;
 volatile byte buttonPressed = 0;
