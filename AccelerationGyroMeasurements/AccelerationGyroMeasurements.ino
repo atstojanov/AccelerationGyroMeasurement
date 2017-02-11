@@ -2,6 +2,7 @@
 #include "Keypad.h"
 #include "OLED_I2C.h"
 #include <MsTimer2.h>
+#include "helper_3dmath.h" 
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
