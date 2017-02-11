@@ -76,7 +76,7 @@ long accOffsetX, accOffsetY, accOffsetZ;
 // отмествания от реалната стойности за жироскопа
 long gyroOffsetX, gyroOffsetY, gyroOffsetZ;
 
-volatile bool refreshNeeded = false; // показва дали данните на дисплея трябва да се опреснят.
+volatile bool updateDisplayNeeded = false; // показва дали данните на дисплея трябва да се опреснят.
 volatile bool needCalibration = false;
 volatile byte buttonPressed = 0;
 volatile byte buttonHolded = 0;
@@ -89,7 +89,7 @@ int accRange = 0, gyroRange = 3; // текущ обхват на акселер�
 
 void interrupt()
 {
-  refreshNeeded = true;
+  updateDisplayNeeded = true;
 }
 
 void setup()
@@ -103,7 +103,7 @@ void setup()
   display.begin();
   display.setFont(SmallFont);
 
-  //Стартиране на I2C в режим мастър
+  //Стартиране на I2C в режим мастър.
   Wire.begin();
 
   // конфигуриране на LED пина, като изход.
@@ -112,7 +112,8 @@ void setup()
   //Конфигуриране на mpu_6050.
   setupMPU6050();
 
-  // calibrateGyro();
+  //Калибриране на сензора.
+  calibrate();
 
   keypad.addEventListener(keypadEvent);
   keypad.setHoldTime(1000);
@@ -170,7 +171,7 @@ void loop()
 
   // calculateAngles();
 
-  refresh();
+  updateDisplay();
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
@@ -413,13 +414,13 @@ void calibrateGyro()
   gyroOffsetZ /= 500; 
 }
 
-void refresh()
+void updateDisplay()
 {
 
-  if (!refreshNeeded)
+  if (!updateDisplayNeeded)
     return;
 
-  refreshNeeded = false;
+  updateDisplayNeeded = false;
 
   display.clrScr();
 
