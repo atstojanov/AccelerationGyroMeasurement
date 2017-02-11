@@ -242,6 +242,12 @@ void getEstimatedInclination()
     normalize3DVector(RwEst);
   }
 
+  // Преизчисляване на ъглите след променените стойности, за визуализация
+  for (w = 0; w <= 1; w++)
+  {
+    Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG; 
+  }
+
   firstSample = false;
 }
 
