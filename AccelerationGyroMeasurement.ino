@@ -106,7 +106,8 @@ void setup()
   pinMode(LED_PIN, OUTPUT);                                                           // LED пина конфигуриран, като изход.
 
   setup_mpu_6050_registers();                                                         //Конфигуриране на mpu_6050.
-  calibrateGyro();
+  
+  // calibrateGyro();
 
   Serial.println("Done");
 }
