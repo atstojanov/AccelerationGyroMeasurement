@@ -72,17 +72,19 @@ extern uint8_t SmallFont[];
 
 VectorInt16 acc;
 
-float acc_total_vector;
+float accVector;
 long ax, ay, az, maxax, maxay, maxaz;
 float accX, accY, accZ;
 long gx, gy, gz, maxgx, maxgy, maxgz;
+float gyroX, gyroY, gyroZ;
+
 long temperature;
-long gyro_x_cal, gyro_y_cal, gyro_z_cal;
+long gyroOffsetX, gyroOffsetY, gyroOffsetZ;
 long loopTimer;
-float angle_pitch, angle_roll, angle_yaw;
-long angle_pitch_buffer, angle_roll_buffer, angle_yaw_buffer;
-float angle_roll_acc, angle_pitch_acc, angle_yaw_acc;
-float angle_pitch_output, angle_roll_output;
+float pitch, roll, angle_yaw;
+long pitchBuffer, rollBuffer, yawBuffer;
+float rollAcc, pitchAcc, yawAcc;
+float pitchOutpu, rollOutput;
 
 volatile bool refreshNeeded = false;
 volatile byte buttonPressed = 0;
@@ -141,9 +143,9 @@ void loop()
 
   read_mpu_6050_data();
 
-  gx -= gyro_x_cal; //Subtract the offset calibration value from the raw gyro_x value
-  gy -= gyro_y_cal; //Subtract the offset calibration value from the raw gyro_y value
-  gz -= gyro_z_cal; //Subtract the offset calibration value from the raw gyro_z value
+  gx -= gyroOffsetX; //Subtract the offset calibration value from the raw gyro_x value
+  gy -= gyroOffsetY; //Subtract the offset calibration value from the raw gyro_y value
+  gz -= gyroOffsetZ; //Subtract the offset calibration value from the raw gyro_z value
 
   accX = rawToRealAcc(ax);
   accY = rawToRealAcc(ay);
@@ -319,13 +321,13 @@ void displayReadings()
   
   //Ред 3
   display.print("roll=", colPos(9), rowPos(3));
-  display.print(angle_roll < 0 ? "-" : "+", colPos(15), rowPos(3));
-  display.printNumF(abs(angle_roll), 2, colPos(16), rowPos(3));
+  display.print(roll < 0 ? "-" : "+", colPos(15), rowPos(3));
+  display.printNumF(abs(roll), 2, colPos(16), rowPos(3));
   
   //Ред 4
   display.print("pitch=", colPos(9), rowPos(4));
-  display.print(angle_pitch < 0 ? "-" : "+", colPos(15), rowPos(4));
-  display.printNumF(abs(angle_pitch), 2, colPos(16), rowPos(4));
+  display.print(pitch < 0 ? "-" : "+", colPos(15), rowPos(4));
+  display.printNumF(abs(pitch), 2, colPos(16), rowPos(4));
 }
 
 int rowPos(int row)
@@ -359,15 +361,15 @@ void calibrateGyro()
   { //Run this code 2000 times
     //if(cal_int % 125 == 0) display.print();                              //Print a dot on the LCD every 125 readings
     read_mpu_6050_data(); //Read the raw acc and gyro data from the MPU-6050
-    gyro_x_cal += gx;     //Add the gyro x-axis offset to the gyro_x_cal variable
-    gyro_y_cal += gy;     //Add the gyro y-axis offset to the gyro_y_cal variable
-    gyro_z_cal += gz;     //Add the gyro z-axis offset to the gyro_z_cal variable
+    gyroOffsetX += gx;     //Add the gyro x-axis offset to the gyroOffsetX variable
+    gyroOffsetY += gy;     //Add the gyro y-axis offset to the gyroOffsetY variable
+    gyroOffsetZ += gz;     //Add the gyro z-axis offset to the gyroOffsetZ variable
     delay(3);             //Delay 3us to simulate the 250Hz program loop
   }
 
-  gyro_x_cal /= 2000; //Divide the gyro_x_cal variable by 2000 to get the avarage offset
-  gyro_y_cal /= 2000; //Divide the gyro_y_cal variable by 2000 to get the avarage offset
-  gyro_z_cal /= 2000; //Divide the gyro_z_cal variable by 2000 to get the avarage offset
+  gyroOffsetX /= 2000; //Divide the gyroOffsetX variable by 2000 to get the avarage offset
+  gyroOffsetY /= 2000; //Divide the gyroOffsetY variable by 2000 to get the avarage offset
+  gyroOffsetZ /= 2000; //Divide the gyroOffsetZ variable by 2000 to get the avarage offset
 }
 
 void refresh()
@@ -420,26 +422,26 @@ double gyroReadingsToDegree(int16_t value)
 
 void calculateAngles()
 {
-  acc_total_vector = sqrt((ax * ax) + (ay * ay) + (az * az)); //Calculate the total accelerometer vector
+  accVector = sqrt((ax * ax) + (ay * ay) + (az * az)); //Calculate the total accelerometer vector
   //The Arduino asin function is in radians
-  angle_pitch += gyroReadingsToDegree(gx);
-  angle_roll += gyroReadingsToDegree(gy);
+  pitch += gyroReadingsToDegree(gx);
+  roll += gyroReadingsToDegree(gy);
 
-  angle_pitch += angle_roll * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD); //If the IMU has yawed transfer the roll angle to the pitch angel
-  angle_roll -= angle_pitch * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD);
+  pitch += roll * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD); //If the IMU has yawed transfer the roll angle to the pitch angel
+  roll -= pitch * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD);
 
-  angle_pitch_acc = asin((float)ax / acc_total_vector) * RAD_TO_DEG;     //Calculate the pitch angle
-  angle_roll_acc = -1 * asin((float)ay / acc_total_vector) * RAD_TO_DEG; //Calculate the roll angle
+  pitchAcc = asin((float)ax / accVector) * RAD_TO_DEG;     //Calculate the pitch angle
+  rollAcc = -1 * asin((float)ay / accVector) * RAD_TO_DEG; //Calculate the roll angle
 
   if (setGyroAngles)
   {
-    angle_pitch = angle_pitch * 0.9995 + angle_pitch_acc * 0.0005;
-    angle_roll = angle_roll * 0.9995 + angle_roll_acc * 0.0005;
+    pitch = pitch * 0.9995 + pitchAcc * 0.0005;
+    roll = roll * 0.9995 + rollAcc * 0.0005;
   }
   else
   {
-    angle_pitch = angle_pitch_acc;
-    angle_roll = angle_roll_acc;
+    pitch = pitchAcc;
+    roll = rollAcc;
     setGyroAngles = true;
   }
 }
