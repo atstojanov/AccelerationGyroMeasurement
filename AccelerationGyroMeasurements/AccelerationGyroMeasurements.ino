@@ -29,9 +29,6 @@
 #define MPU6050_RA_GYRO_CONFIG 0x1B
 #define MPU6050_RA_ACCEL_CONFIG 0x1C
 
-#define UPPER_RANGE 29491  // 90% 
-#define BOTTOM_RANGE 24576 // 75% 
-
 #define LED_PIN 13
 
 char *labelsXYZ[] = { "x=", "y=", "z=" };
@@ -329,14 +326,7 @@ void rawToReal()
     realGyro[i] = rawToRealGyro(rawGyro[i]);
     realAcc[i] = rawToRealAcc(rawAcc[i]);
   }
-
 }
-
-// void compare(int16_t current, int16_t *maxvalue)
-// {
-//   if (abs(current) > abs(*maxvalue))
-//     *maxvalue = current;
-// }
 
 // рестарт
 void reset()
@@ -347,65 +337,6 @@ void reset()
   setFullScaleAccRange(accRange);
   setFullScaleGyroRange(gyroRange);
 }
-
-// void checkRange()
-// {
-//   //Check max acceleration
-//   if (abs(ax) > UPPER_RANGE || abs(ay) > UPPER_RANGE || abs(az) > UPPER_RANGE)
-//   {
-//     if (accRange < 3)
-//     {
-//       accRange++;
-//       maxax = maxax / 2;
-//       maxay = maxay / 2;
-//       maxaz = maxaz / 2;
-//       setFullScaleAccRange(accRange);
-//       //mpu.setFullScaleAccelRange(accRange);
-//       //reset();
-//     }
-//   }
-//   //  else if(abs(maxax) < BOTTOM_RANGE || abs(maxay) < BOTTOM_RANGE || abs(maxaz) < BOTTOM_RANGE)
-//   //  {
-//   //    if(accRange > 0)
-//   //    {
-//   //      accRange--;
-//   //      mpu.setFullScaleAccelRange(accRange);
-//   //      reset();
-//   //    }
-//   //  }
-
-//   //Check max gyro
-//   if (abs(gx) > UPPER_RANGE || abs(gy) > UPPER_RANGE || abs(gz) > UPPER_RANGE)
-//   {
-//     if (gyroRange < 3)
-//     {
-//       gyroRange++;
-//       maxgx = maxgx / 2;
-//       maxgy = maxgy / 2;
-//       maxgz = maxgz / 2;
-//       setFullScaleGyroRange(gyroRange);
-//     }
-//   }
-//   //  else if(abs(maxgx) < BOTTOM_RANGE || abs(maxgy) < BOTTOM_RANGE || abs(maxgz) < BOTTOM_RANGE)
-//   //  {
-//   //    if(gyroRange > 0)
-//   //    {
-//   //      gyroRange--;
-//   //      mpu.setFullScaleGyroRange(accRange);
-//   //      reset();
-//   //    }
-//   //  }
-// }
-
-// int16_t int_pow(int16_t base, int16_t exp)
-// {
-//   int result = base;
-//   for (int i = 1; i < exp; i++)
-//   {
-//     result *= base;
-//   }
-//   return result;
-// }
 
 // показване на данните на екрана
 void displayReadings()
