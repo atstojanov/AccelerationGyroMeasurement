@@ -2,7 +2,6 @@
 #include "Keypad.h"
 #include "OLED_I2C.h"
 #include <MsTimer2.h>
-#include "helper_3dmath.h" 
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
@@ -50,8 +49,10 @@
 
 #define GYRO_MEASUREMENT_INTERVAL 4 //miliseconds
 
-//
 #define LED_PIN 13
+
+char *labelsXYZ[] = { "x=", "y=", "z=" };
+char *labelsYPR[] = { "pitch=", "roll=", "yaw="};
 
 const byte ROWS = 2; //Два реда
 const byte COLS = 2; //Две колони
@@ -70,26 +71,32 @@ int displayInterval = 500;
 OLED display(SDA, SCL, 10);
 extern uint8_t SmallFont[];
 
-VectorInt16 acc;
+//float accVector;
+long rawAcc[3];
+long rawGyro[3];
+float realGyro[3];
 
-float accVector;
-long ax, ay, az, maxax, maxay, maxaz;
-float accX, accY, accZ;
-long gx, gy, gz, maxgx, maxgy, maxgz;
-float gyroX, gyroY, gyroZ;
+unsigned long interval; //interval since previous samples
+float RwAcc[3];         //projection of normalized gravitation force vector on x/y/z axis, as measured by accelerometer
+float RwGyro[3];        //Rw obtained from last estimated value and gyro movement
+float Awz[2];           //angles between projection of R on XZ/YZ plane and Z axis (deg)
 
-long temperature;
 long gyroOffsetX, gyroOffsetY, gyroOffsetZ;
-long loopTimer;
-float pitch, roll, angle_yaw;
+float pitch, roll, yaw;
+
 long pitchBuffer, rollBuffer, yawBuffer;
 float rollAcc, pitchAcc, yawAcc;
 float pitchOutpu, rollOutput;
 
 volatile bool refreshNeeded = false;
 volatile byte buttonPressed = 0;
-volatile bool setGyroAngles = false;
+volatile bool firstSample = true;
 
+float wGyro;
+
+float RwEst[3]; //Rw estimated from combining RwAcc and RwGyro
+unsigned long lastMicros;
+int temperature;
 int menuPosition = MENU_HOME;
 
 void interrupt()
@@ -106,7 +113,7 @@ void setup()
 
   Wire.begin(); //Стартиране на I2C в режим мастър
 
-  Serial.begin(38400); //Стартиране на серийната комуникация. Скорост 38400 bps
+  Serial.begin(115200); //Стартиране на серийната комуникация. Скорост 38400 bps
   Serial.println("Setting some things up.");
 
   MsTimer2::set(100, interrupt);
@@ -118,61 +125,136 @@ void setup()
 
   // calibrateGyro();
 
+  wGyro = 10;
+
+  firstSample = true;
   Serial.println("Done");
-  loopTimer = micros();
 }
 
 void loop()
 {
 
-  buttonPressed = keypad.getKey();
-  switch (buttonPressed)
-  {
-  case BUTTON_1:
-    reset();
-    break;
-  case BUTTON_3:
-    if (menuPosition == MENU_HOME)
-      menuPosition = MENU_HOME_MAX;
-    else
-      menuPosition = MENU_HOME;
-    break;
-  }
+  read_mpu_6050_data();
+  getEstimatedInclination();
+
+  // buttonPressed = keypad.getKey();
+  // switch (buttonPressed)
+  // {
+  // case BUTTON_1:
+  //   reset();
+  //   break;
+  // case BUTTON_3:
+  //   if (menuPosition == MENU_HOME)
+  //     menuPosition = MENU_HOME_MAX;
+  //   else
+  //     menuPosition = MENU_HOME;
+  //   break;
+  // }
 
   //  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
-  read_mpu_6050_data();
+  // gx -= gyroOffsetX; //Subtract the offset calibration value from the raw gyro_x value
+  // gy -= gyroOffsetY; //Subtract the offset calibration value from the raw gyro_y value
+  // gz -= gyroOffsetZ; //Subtract the offset calibration value from the raw gyro_z value
 
-  gx -= gyroOffsetX; //Subtract the offset calibration value from the raw gyro_x value
-  gy -= gyroOffsetY; //Subtract the offset calibration value from the raw gyro_y value
-  gz -= gyroOffsetZ; //Subtract the offset calibration value from the raw gyro_z value
-
-  accX = rawToRealAcc(ax);
-  accY = rawToRealAcc(ay);
-  accZ = rawToRealAcc(az);
-
-  Serial.print(accX);
-  Serial.print("\t");
-  Serial.print(accY);
-  Serial.print("\t");
-  Serial.println(accZ);
-  
-  //  compare(ax, &maxax);
-  //  compare(ay, &maxay);
-  //  compare(az, &maxaz);
-  //  compare(gx, &maxgx);
-  //  compare(gy, &maxgy);
-  //  compare(gz, &maxgz);
-  //
-  //  checkRange();
-
-  calculateAngles();
+  // calculateAngles();
 
   refresh();
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  while (micros() - loopTimer < 4000)
-    ;                   //Wait until the loopTimer reaches 4000us (250Hz) before starting the next loop
-  loopTimer = micros(); //Reset the loop timer
+  // while (micros() - loopTimer < 1000 * GYRO_MEASUREMENT_INTERVAL)
+  //   ;                   //Wait until the loopTimer reaches 4000us (250Hz) before starting the next loop
+  // loopTimer = micros(); //Reset the loop timer
+}
+
+void getEstimatedInclination()
+{
+  static int i, w;
+  static float tmpf, tmpf2;
+  static unsigned long newMicros; //new timestamp
+  static char signRzGyro;
+
+  //Serial.println("Calculate inclination");
+
+  //get raw adc readings
+  newMicros = micros(); //save the time when sample is taken
+
+  //for(i=0;i<INPUT_COUNT;i++) an[i]= analogRead(i);
+
+  //compute interval since last sampling time
+  interval = newMicros - lastMicros; //please note that overflows are ok, since for example 0x0001 - 0x00FE will be equal to 2
+  lastMicros = newMicros;            //save for next loop, please note interval will be invalid in first sample but we don't use it
+
+  //get accelerometer readings in g, gives us RwAcc vector
+  for (w = 0; w <= 2; w++)
+  {
+    RwAcc[w] = rawToRealAcc(rawAcc[w]);
+    realGyro[w] = rawToRealGyro(rawGyro[w]);
+  }
+
+  //normalize vector (convert to a vector with same direction and with length 1)
+  normalize3DVector(RwAcc);
+
+  if (firstSample)
+  {
+    for (w = 0; w <= 2; w++)
+      RwEst[w] = RwAcc[w]; //initialize with accelerometer readings
+  }
+  else
+  {
+    //evaluate RwGyro vector
+    if (abs(RwEst[2]) < 0.1)
+    {
+      //Rz is too small and because it is used as reference for computing Axz, Ayz it's error fluctuations will amplify leading to bad results
+      //in this case skip the gyro data and just use previous estimate
+      for (w = 0; w <= 2; w++)
+        RwGyro[w] = RwEst[w];
+    }
+    else
+    {
+      //get angles between projection of R on ZX/ZY plane and Z axis, based on last RwEst
+      for (w = 0; w <= 1; w++)
+      {
+        tmpf = realGyro[w] / 1000.0;                   //get current gyro rate in deg/ms
+        tmpf *= interval / 1000.0f;                    //get angle change in deg
+        Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG; //get angle and convert to degrees
+        Awz[w] += tmpf;                                //get updated angle according to gyro movement
+      }
+
+      //estimate sign of RzGyro by looking in what qudrant the angle Axz is,
+      //RzGyro is pozitive if  Axz in range -90 ..90 => cos(Awz) >= 0
+      signRzGyro = (cos(Awz[0] * DEG_TO_RAD) >= 0) ? 1 : -1;
+
+      //reverse calculation of RwGyro from Awz angles, for formula deductions see  http://starlino.com/imu_guide.html
+      for (w = 0; w <= 1; w++)
+      {
+        RwGyro[w] = sin(Awz[w] * DEG_TO_RAD);
+        RwGyro[w] /= sqrt(1 + squared(cos(Awz[w] * DEG_TO_RAD)) * squared(tan(Awz[1 - w] * DEG_TO_RAD)));
+      }
+      RwGyro[2] = signRzGyro * sqrt(1 - squared(RwGyro[0]) - squared(RwGyro[1]));
+    }
+
+    //combine Accelerometer and gyro readings
+    for (w = 0; w <= 2; w++)
+      RwEst[w] = (RwAcc[w] + wGyro * RwGyro[w]) / (1 + wGyro);
+
+    normalize3DVector(RwEst);
+  }
+
+  firstSample = false;
+}
+
+void normalize3DVector(float *vector)
+{
+  static float R;
+  R = sqrt(vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2]);
+  vector[0] /= R;
+  vector[1] /= R;
+  vector[2] /= R;
+}
+
+float squared(float x)
+{
+  return x * x;
 }
 
 void read_mpu_6050_data()
@@ -184,13 +266,13 @@ void read_mpu_6050_data()
   while (Wire.available() < 14)
   {
   };                                            //Wait until all the bytes are received
-  ax = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the acc_x variable
-  ay = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the acc_y variable
-  az = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the acc_z variable
+  rawAcc[0] = Wire.read() << 8 | Wire.read();   //Add the low and high byte to the acc_x variable
+  rawAcc[1] = Wire.read() << 8 | Wire.read();   //Add the low and high byte to the acc_y variable
+  rawAcc[2] = Wire.read() << 8 | Wire.read();   //Add the low and high byte to the acc_z variable
   temperature = Wire.read() << 8 | Wire.read(); //Add the low and high byte to the temperature variable
-  gx = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the gyro_x variable
-  gy = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the gyro_y variable
-  gz = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the gyro_z variable
+  rawGyro[0] = Wire.read() << 8 | Wire.read();  //Add the low and high byte to the gyro_x variable
+  rawGyro[1] = Wire.read() << 8 | Wire.read();  //Add the low and high byte to the gyro_y variable
+  rawGyro[2] = Wire.read() << 8 | Wire.read();  //Add the low and high byte to the gyro_z variable
 }
 
 void setFullScaleAccRange(uint8_t range)
@@ -228,7 +310,7 @@ void compare(int16_t current, int16_t *maxvalue)
 
 void reset()
 {
-  maxax = maxay = maxaz = maxgx = maxgy = maxgz = 0;
+  //maxax = maxay = maxaz = maxgx = maxgy = maxgz = 0;
   accRange = 0;
   gyroRange = 0;
   setFullScaleAccRange(accRange);
@@ -237,54 +319,54 @@ void reset()
   //mpu.setFullScaleGyroRange(gyroRange);
 }
 
-void checkRange()
-{
-  //Check max acceleration
-  if (abs(ax) > UPPER_RANGE || abs(ay) > UPPER_RANGE || abs(az) > UPPER_RANGE)
-  {
-    if (accRange < 3)
-    {
-      accRange++;
-      maxax = maxax / 2;
-      maxay = maxay / 2;
-      maxaz = maxaz / 2;
-      setFullScaleAccRange(accRange);
-      //mpu.setFullScaleAccelRange(accRange);
-      //reset();
-    }
-  }
-  //  else if(abs(maxax) < BOTTOM_RANGE || abs(maxay) < BOTTOM_RANGE || abs(maxaz) < BOTTOM_RANGE)
-  //  {
-  //    if(accRange > 0)
-  //    {
-  //      accRange--;
-  //      mpu.setFullScaleAccelRange(accRange);
-  //      reset();
-  //    }
-  //  }
+// void checkRange()
+// {
+//   //Check max acceleration
+//   if (abs(ax) > UPPER_RANGE || abs(ay) > UPPER_RANGE || abs(az) > UPPER_RANGE)
+//   {
+//     if (accRange < 3)
+//     {
+//       accRange++;
+//       maxax = maxax / 2;
+//       maxay = maxay / 2;
+//       maxaz = maxaz / 2;
+//       setFullScaleAccRange(accRange);
+//       //mpu.setFullScaleAccelRange(accRange);
+//       //reset();
+//     }
+//   }
+//   //  else if(abs(maxax) < BOTTOM_RANGE || abs(maxay) < BOTTOM_RANGE || abs(maxaz) < BOTTOM_RANGE)
+//   //  {
+//   //    if(accRange > 0)
+//   //    {
+//   //      accRange--;
+//   //      mpu.setFullScaleAccelRange(accRange);
+//   //      reset();
+//   //    }
+//   //  }
 
-  //Check max gyro
-  if (abs(gx) > UPPER_RANGE || abs(gy) > UPPER_RANGE || abs(gz) > UPPER_RANGE)
-  {
-    if (gyroRange < 3)
-    {
-      gyroRange++;
-      maxgx = maxgx / 2;
-      maxgy = maxgy / 2;
-      maxgz = maxgz / 2;
-      setFullScaleGyroRange(gyroRange);
-    }
-  }
-  //  else if(abs(maxgx) < BOTTOM_RANGE || abs(maxgy) < BOTTOM_RANGE || abs(maxgz) < BOTTOM_RANGE)
-  //  {
-  //    if(gyroRange > 0)
-  //    {
-  //      gyroRange--;
-  //      mpu.setFullScaleGyroRange(accRange);
-  //      reset();
-  //    }
-  //  }
-}
+//   //Check max gyro
+//   if (abs(gx) > UPPER_RANGE || abs(gy) > UPPER_RANGE || abs(gz) > UPPER_RANGE)
+//   {
+//     if (gyroRange < 3)
+//     {
+//       gyroRange++;
+//       maxgx = maxgx / 2;
+//       maxgy = maxgy / 2;
+//       maxgz = maxgz / 2;
+//       setFullScaleGyroRange(gyroRange);
+//     }
+//   }
+//   //  else if(abs(maxgx) < BOTTOM_RANGE || abs(maxgy) < BOTTOM_RANGE || abs(maxgz) < BOTTOM_RANGE)
+//   //  {
+//   //    if(gyroRange > 0)
+//   //    {
+//   //      gyroRange--;
+//   //      mpu.setFullScaleGyroRange(accRange);
+//   //      reset();
+//   //    }
+//   //  }
+// }
 
 int16_t int_pow(int16_t base, int16_t exp)
 {
@@ -300,34 +382,21 @@ void displayReadings()
 {
   //Ред 2
   display.print("Accel", colPos(0), rowPos(2));
-
-  //Ред3
-  display.print("x=", colPos(0), rowPos(3));
-  display.print(accX < 0.0 ? "-" : "+", colPos(2), rowPos(3));
-  display.printNumF(abs(accX), 2, colPos(3), rowPos(3));
-
-  //Ред 4
-  display.print("y=", colPos(0), rowPos(4));
-  display.print(accY < 0 ? "-" : "+", colPos(2), rowPos(4));
-  display.printNumF(abs(accY), 2, colPos(3), rowPos(4));
-
-  //Ред 5
-  display.print("z=", colPos(0), rowPos(5));
-  display.print(accZ < 0 ? "-" : "+", colPos(2), rowPos(5));
-  display.printNumF(abs(accZ), 2, colPos(3), rowPos(5));
-
-  //Ред 2
   display.print("Angles", colPos(9), rowPos(2));
-  
-  //Ред 3
-  display.print("roll=", colPos(9), rowPos(3));
-  display.print(roll < 0 ? "-" : "+", colPos(15), rowPos(3));
-  display.printNumF(abs(roll), 2, colPos(16), rowPos(3));
-  
-  //Ред 4
-  display.print("pitch=", colPos(9), rowPos(4));
-  display.print(pitch < 0 ? "-" : "+", colPos(15), rowPos(4));
-  display.printNumF(abs(pitch), 2, colPos(16), rowPos(4));
+
+  for (int i = 0; i < 3; i++)
+  {
+    display.print(labelsXYZ[i], colPos(0), rowPos(3 + i));
+    if(RwAcc[i] < 0.0) display.print("-", colPos(2), rowPos(3 + i));
+    display.printNumF(abs(RwAcc[i]), 2, colPos(3), rowPos(3 + i));
+  }
+
+  for (int i = 0; i < 2; i++)
+  {
+    display.print(labelsYPR[i], colPos(9), rowPos(3 + i));
+    if(Awz[i] < 0.0) display.print("-", colPos(15), rowPos(3 + i));
+    display.printNumF(abs(Awz[i]), 2, colPos(16), rowPos(3 + i));
+  }
 }
 
 int rowPos(int row)
@@ -350,27 +419,27 @@ void displayButtons()
   display.print("Rst", 97, 63 - 8);
 }
 
-void calibrateGyro()
-{
+// void calibrateGyro()
+// {
 
-  display.clrScr();
-  display.print("Calibrating gyro", 0, 0);
-  display.update();
+//   display.clrScr();
+//   display.print("Calibrating gyro", 0, 0);
+//   display.update();
 
-  for (int cal_int = 0; cal_int < 2000; cal_int++)
-  { //Run this code 2000 times
-    //if(cal_int % 125 == 0) display.print();                              //Print a dot on the LCD every 125 readings
-    read_mpu_6050_data(); //Read the raw acc and gyro data from the MPU-6050
-    gyroOffsetX += gx;     //Add the gyro x-axis offset to the gyroOffsetX variable
-    gyroOffsetY += gy;     //Add the gyro y-axis offset to the gyroOffsetY variable
-    gyroOffsetZ += gz;     //Add the gyro z-axis offset to the gyroOffsetZ variable
-    delay(3);             //Delay 3us to simulate the 250Hz program loop
-  }
+//   for (int cal_int = 0; cal_int < 2000; cal_int++)
+//   { //Run this code 2000 times
+//     //if(cal_int % 125 == 0) display.print();                              //Print a dot on the LCD every 125 readings
+//     read_mpu_6050_data(); //Read the raw acc and gyro data from the MPU-6050
+//     gyroOffsetX += gx;    //Add the gyro x-axis offset to the gyroOffsetX variable
+//     gyroOffsetY += gy;    //Add the gyro y-axis offset to the gyroOffsetY variable
+//     gyroOffsetZ += gz;    //Add the gyro z-axis offset to the gyroOffsetZ variable
+//     delay(3);             //Delay 3us to simulate the 250Hz program loop
+//   }
 
-  gyroOffsetX /= 2000; //Divide the gyroOffsetX variable by 2000 to get the avarage offset
-  gyroOffsetY /= 2000; //Divide the gyroOffsetY variable by 2000 to get the avarage offset
-  gyroOffsetZ /= 2000; //Divide the gyroOffsetZ variable by 2000 to get the avarage offset
-}
+//   gyroOffsetX /= 2000; //Divide the gyroOffsetX variable by 2000 to get the avarage offset
+//   gyroOffsetY /= 2000; //Divide the gyroOffsetY variable by 2000 to get the avarage offset
+//   gyroOffsetZ /= 2000; //Divide the gyroOffsetZ variable by 2000 to get the avarage offset
+// }
 
 void refresh()
 {
@@ -420,28 +489,30 @@ double gyroReadingsToDegree(int16_t value)
   return rawToRealGyro(value) * 0.001 * GYRO_MEASUREMENT_INTERVAL;
 }
 
-void calculateAngles()
-{
-  accVector = sqrt((ax * ax) + (ay * ay) + (az * az)); //Calculate the total accelerometer vector
-  //The Arduino asin function is in radians
-  pitch += gyroReadingsToDegree(gx);
-  roll += gyroReadingsToDegree(gy);
+// void calculateAngles()
+// {
+//   //Изчисляване на Racc.
+//   accVector = sqrt((ax * ax) + (ay * ay) + (az * az));
 
-  pitch += roll * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD); //If the IMU has yawed transfer the roll angle to the pitch angel
-  roll -= pitch * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD);
+//   //The Arduino asin function is in radians
+//   pitch += gyroReadingsToDegree(gx);
+//   roll += gyroReadingsToDegree(gy);
 
-  pitchAcc = asin((float)ax / accVector) * RAD_TO_DEG;     //Calculate the pitch angle
-  rollAcc = -1 * asin((float)ay / accVector) * RAD_TO_DEG; //Calculate the roll angle
+//   pitch += roll * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD); //If the IMU has yawed transfer the roll angle to the pitch angel
+//   roll -= pitch * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD);
 
-  if (setGyroAngles)
-  {
-    pitch = pitch * 0.9995 + pitchAcc * 0.0005;
-    roll = roll * 0.9995 + rollAcc * 0.0005;
-  }
-  else
-  {
-    pitch = pitchAcc;
-    roll = rollAcc;
-    setGyroAngles = true;
-  }
-}
+//   pitchAcc = asin((float)ax / accVector) * RAD_TO_DEG;     //Calculate the pitch angle
+//   rollAcc = -1 * asin((float)ay / accVector) * RAD_TO_DEG; //Calculate the roll angle
+
+//   if (firstSample)
+//   {
+//     pitch = pitch * 0.9995 + pitchAcc * 0.0005;
+//     roll = roll * 0.9995 + rollAcc * 0.0005;
+//   }
+//   else
+//   {
+//     pitch = pitchAcc;
+//     roll = rollAcc;
+//     firstSample = true;
+//   }
+// }
