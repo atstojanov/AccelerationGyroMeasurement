@@ -273,7 +273,7 @@ void setupMPU6050()
   Wire.endTransmission();                  
   // задаване на най-нисък обхват на работа
   setFullScaleAccRange(0);
-  setFullScaleGyroRange(0);
+  setFullScaleGyroRange(3); // set to 2000 deg/s
 }
 
 void setFullScaleAccRange(uint8_t range)
