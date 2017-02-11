@@ -31,13 +31,13 @@
 
 #define LED_PIN 13
 
-char *labelsXYZ[] = { "x=", "y=", "z=" };
-char *labelsYPR[] = { "pitch=", "roll=", "yaw="};
+char *labelsXYZ[] = {"x=", "y=", "z="};
+char *labelsYPR[] = {"pitch=", "roll=", "yaw="};
 
 // Брой редове на клавиатурата
-const byte ROWS = 2; 
+const byte ROWS = 2;
 // Брой колони на клавиатурата
-const byte COLS = 2; 
+const byte COLS = 2;
 
 // Описание на стойностите, на които отговарят бутоните на клавиатурата
 char keys[ROWS][COLS] = {
@@ -45,18 +45,18 @@ char keys[ROWS][COLS] = {
     {'2', '1'}};
 
 //пинове към които са свързани редовете на клавиатурата
-byte rowPins[ROWS] = {4, 5}; 
+byte rowPins[ROWS] = {4, 5};
 //пинове към които са свързани колоните на клавиатурата
-byte colPins[COLS] = {6, 7}; 
+byte colPins[COLS] = {6, 7};
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 OLED display(SDA, SCL, 10);
 extern uint8_t SmallFont[];
 
-long rawAcc[3]; // данни от акселерометъра в чист вид.
-long rawGyro[3]; // данни от жироскопа в чист вид.
-float realAcc[3]; // показания на акселерометъра в g.
+long rawAcc[3];    // данни от акселерометъра в чист вид.
+long rawGyro[3];   // данни от жироскопа в чист вид.
+float realAcc[3];  // показания на акселерометъра в g.
 float realGyro[3]; // показания на жироскопа в deg/s.
 
 unsigned long interval; // интервал от време изминал от последното изчисление
@@ -77,13 +77,15 @@ long accOffsetX, accOffsetY, accOffsetZ;
 long gyroOffsetX, gyroOffsetY, gyroOffsetZ;
 
 volatile bool refreshNeeded = false; // показва дали данните на дисплея трябва да се опреснят.
-volatile byte buttonPressed = 0; // показва дали е натиснат бутон
+volatile bool needCalibration = false;
+volatile byte buttonPressed = 0;
+volatile byte buttonHolded = 0;
 
 bool firstSample = true; // Първо изчисление или не?
 
 int menuPosition = MENU_HOME;
 
-int accRange, gyroRange; // текущ обхват на акселерометъра и жироскопа
+int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
 
 void interrupt()
 {
@@ -93,24 +95,27 @@ void interrupt()
 void setup()
 {
   //Стартиране на серийната комуникация. Скорост 38400 bps
-  Serial.begin(38400); 
+  Serial.begin(38400);
   // Издаване на съобщение за старт на инициализацията
   Serial.println("Initialization ...");
 
   // Стартиране на връзката с дисплея.
-  display.begin(); 
+  display.begin();
   display.setFont(SmallFont);
-  
+
   //Стартиране на I2C в режим мастър
-  Wire.begin(); 
-  
+  Wire.begin();
+
   // конфигуриране на LED пина, като изход.
-  pinMode(LED_PIN, OUTPUT); 
+  pinMode(LED_PIN, OUTPUT);
 
   //Конфигуриране на mpu_6050.
-  setupMPU6050(); 
+  setupMPU6050();
 
   // calibrateGyro();
+
+  keypad.addEventListener(keypadEvent);
+  keypad.setHoldTime(1000);
 
   wGyro = 10;
 
@@ -124,25 +129,26 @@ void setup()
 
 void loop()
 {
-
+  readButtons();
+  processButtons();
   readMPU6050();
   rawToReal();
   getEstimatedInclination();
-  
-  Serial.print(interval);  //microseconds since last sample, monitor this value to be < 10000, increase bitrate to print faster
-  Serial.print(",");    
-  Serial.print(realAcc[0]);  //Inclination X axis (as measured by accelerometer)
-  Serial.print(",");
-  Serial.print(RwAcc[0]);  //Inclination X axis (estimated / filtered)
-  Serial.print(",");    
-  Serial.print(realAcc[1]);  //Inclination Y axis (as measured by accelerometer)
-  Serial.print(",");
-  Serial.print(RwAcc[1]);  //Inclination Y axis (estimated / filtered)
-  Serial.print(",");    
-  Serial.print(realAcc[2]);  //Inclination Z axis (as measured by accelerometer)
-  Serial.print(",");
-  Serial.print(RwAcc[2]);  //Inclination Z axis (estimated / filtered)  
-  Serial.println("");
+
+  // Serial.print(interval);  //microseconds since last sample, monitor this value to be < 10000, increase bitrate to print faster
+  // Serial.print(",");
+  // Serial.print(realAcc[0]);  //Inclination X axis (as measured by accelerometer)
+  // Serial.print(",");
+  // Serial.print(RwAcc[0]);  //Inclination X axis (estimated / filtered)
+  // Serial.print(",");
+  // Serial.print(realAcc[1]);  //Inclination Y axis (as measured by accelerometer)
+  // Serial.print(",");
+  // Serial.print(RwAcc[1]);  //Inclination Y axis (estimated / filtered)
+  // Serial.print(",");
+  // Serial.print(realAcc[2]);  //Inclination Z axis (as measured by accelerometer)
+  // Serial.print(",");
+  // Serial.print(RwAcc[2]);  //Inclination Z axis (estimated / filtered)
+  // Serial.println("");
 
   // buttonPressed = keypad.getKey();
   // switch (buttonPressed)
@@ -176,17 +182,17 @@ void getEstimatedInclination()
   static char signRzGyro;
 
   // Запазва се времето когато е направено измерването
-  newMicros = micros(); 
+  newMicros = micros();
 
   // Изчисляване на интервала от време от предишното измерване
-  interval = newMicros - lastMicros; 
+  interval = newMicros - lastMicros;
   // Запазване за следващото измерване. При първото измерване тази стойност ще е невалидна, но в този случай тя не влиза в изчисленията.
   lastMicros = newMicros;
 
   // Получаване на данните за акселерометъра в g.
   for (w = 0; w <= 2; w++)
   {
-    // вектор RwAcc 
+    // вектор RwAcc
     RwAcc[w] = realAcc[w];
   }
 
@@ -197,7 +203,7 @@ void getEstimatedInclination()
   {
     // Първа стойност. Вземат се данните от акселерометъра
     for (w = 0; w <= 2; w++)
-      RwEst[w] = RwAcc[w]; 
+      RwEst[w] = RwAcc[w];
   }
   else
   {
@@ -214,10 +220,10 @@ void getEstimatedInclination()
       // изчисляване на ъглите между проекцията на R върху ZX/ZY и оста Z, базирани на последните изчисления RwEst
       for (w = 0; w <= 1; w++)
       {
-        tmpf = realGyro[w] / 1000.0;                   // текуща стойност на жироскопа в deg/ms
-        tmpf *= interval / 1000.0f;                    // промяна на ъгъла в градуси
+        tmpf = realGyro[w] / 1000.0;                     // текуща стойност на жироскопа в deg/ms
+        tmpf *= interval / 1000.0f;                      // промяна на ъгъла в градуси
         Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG; // изчисляване на ъглите в градуси
-        Awz[w] += tmpf;                                // нова стойност за ъгъла, спрямо жироскопа
+        Awz[w] += tmpf;                                  // нова стойност за ъгъла, спрямо жироскопа
       }
       // Определяне знака на RzGyro, като проверяваме в кой квадрант лежи ъгъла Axz.
       // RzGyro е положителен ако Axz е в границите -90 до 90 градуса => cos(Awz) >= 0
@@ -242,7 +248,7 @@ void getEstimatedInclination()
   // Преизчисляване на ъглите след променените стойности, за визуализация
   for (w = 0; w <= 1; w++)
   {
-    Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG; 
+    Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG;
   }
 
   firstSample = false;
@@ -267,61 +273,60 @@ float squared(float x)
 void setupMPU6050()
 {
   // изкарване на от режим Sleep MPU-6050
-  Wire.beginTransmission(MPU6050_ADDRESS); 
-  Wire.write(0x6B);                        
-  Wire.write(0x01);                        
-  Wire.endTransmission();                  
+  Wire.beginTransmission(MPU6050_ADDRESS);
+  Wire.write(0x6B);
+  Wire.write(0x01);
+  Wire.endTransmission();
   // задаване на най-нисък обхват на работа
-  setFullScaleAccRange(0);
-  setFullScaleGyroRange(3); // set to 2000 deg/s
+  setFullScaleAccRange(accRange);
+  setFullScaleGyroRange(gyroRange); //2000 deg/s
 }
 
 void setFullScaleAccRange(uint8_t range)
 {
   // задаване на обхват на акселерометъра
-  Wire.beginTransmission(MPU6050_ADDRESS); 
-  Wire.write(MPU6050_RA_ACCEL_CONFIG);     
+  Wire.beginTransmission(MPU6050_ADDRESS);
+  Wire.write(MPU6050_RA_ACCEL_CONFIG);
   // битове 3 и 4 определят обхвата
-  Wire.write(range << 3);                  
-  Wire.endTransmission();                  
+  Wire.write(range << 3);
+  Wire.endTransmission();
 }
 
 void setFullScaleGyroRange(uint8_t range)
 {
   // задаване на обхват на жироскопа
-  Wire.beginTransmission(MPU6050_ADDRESS); 
-  Wire.write(MPU6050_RA_GYRO_CONFIG);      
+  Wire.beginTransmission(MPU6050_ADDRESS);
+  Wire.write(MPU6050_RA_GYRO_CONFIG);
   // битове 3 и 4 определят обхвата
-  Wire.write(range << 3);                  
-  Wire.endTransmission();                  
+  Wire.write(range << 3);
+  Wire.endTransmission();
 }
 
 // четене на данните от MPU6050
 void readMPU6050()
-{                                          
+{
   // Начало на комуникацията с MPU-6050 по I2C.
-  Wire.beginTransmission(MPU6050_ADDRESS); 
-  Wire.write(0x3B);                        // Изпращане на адреса на регистъра от който ще се чете    
-  Wire.endTransmission();                  // Край на предааването
-  Wire.requestFrom(MPU6050_ADDRESS, 14);   // Заявка за 14 байта от MPU-6050
-  while (Wire.available() < 14)            // Изчакване докато бойтовете са получени
+  Wire.beginTransmission(MPU6050_ADDRESS);
+  Wire.write(0x3B);                      // Изпращане на адреса на регистъра от който ще се чете
+  Wire.endTransmission();                // Край на предааването
+  Wire.requestFrom(MPU6050_ADDRESS, 14); // Заявка за 14 байта от MPU-6050
+  while (Wire.available() < 14)          // Изчакване докато бойтовете са получени
   {
-  };                                            
-  // Измерените стойности от сензора са 16 битови. Четенето по I2C е на части от по 8 бита. 
+  };
+  // Измерените стойности от сензора са 16 битови. Четенето по I2C е на части от по 8 бита.
   // за това се налага събирането на два последователни байта в една стойностт.
-  rawAcc[0] = Wire.read() << 8 | Wire.read();   
-  rawAcc[1] = Wire.read() << 8 | Wire.read();   
-  rawAcc[2] = Wire.read() << 8 | Wire.read();   
-  temperature = Wire.read() << 8 | Wire.read(); 
-  rawGyro[0] = Wire.read() << 8 | Wire.read();  
-  rawGyro[1] = Wire.read() << 8 | Wire.read();  
-  rawGyro[2] = Wire.read() << 8 | Wire.read();  
-  
+  rawAcc[0] = Wire.read() << 8 | Wire.read();
+  rawAcc[1] = Wire.read() << 8 | Wire.read();
+  rawAcc[2] = Wire.read() << 8 | Wire.read();
+  temperature = Wire.read() << 8 | Wire.read();
+  rawGyro[0] = Wire.read() << 8 | Wire.read();
+  rawGyro[1] = Wire.read() << 8 | Wire.read();
+  rawGyro[2] = Wire.read() << 8 | Wire.read();
 }
 
 void rawToReal()
 {
-  for(int i = 0; i < 3; i++)
+  for (int i = 0; i < 3; i++)
   {
     realGyro[i] = rawToRealGyro(rawGyro[i]);
     realAcc[i] = rawToRealAcc(rawAcc[i]);
@@ -333,7 +338,7 @@ void reset()
 {
   firstSample = true;
   accRange = 0;
-  gyroRange = 0;
+  gyroRange = 3;
   setFullScaleAccRange(accRange);
   setFullScaleGyroRange(gyroRange);
 }
@@ -341,21 +346,23 @@ void reset()
 // показване на данните на екрана
 void displayReadings()
 {
-  
+
   display.print("Accel", colPos(0), rowPos(2));
   display.print("Angles", colPos(9), rowPos(2));
 
   for (int i = 0; i < 3; i++)
   {
     display.print(labelsXYZ[i], colPos(0), rowPos(3 + i));
-    if(realAcc[i] < 0.0) display.print("-", colPos(2), rowPos(3 + i));
+    if (realAcc[i] < 0.0)
+      display.print("-", colPos(2), rowPos(3 + i));
     display.printNumF(abs(realAcc[i]), 2, colPos(3), rowPos(3 + i));
   }
 
   for (int i = 0; i < 2; i++)
   {
     display.print(labelsYPR[i], colPos(9), rowPos(3 + i));
-    if(Awz[i] < 0.0) display.print("-", colPos(15), rowPos(3 + i));
+    if (Awz[i] < 0.0)
+      display.print("-", colPos(15), rowPos(3 + i));
     display.printNumF(abs(Awz[i]), 2, colPos(16), rowPos(3 + i));
   }
 }
@@ -383,27 +390,28 @@ void displayButtons()
   display.print("Rst", 97, 63 - 8);
 }
 
-// void calibrateGyro()
-// {
+void calibrateGyro()
+{
 
-//   display.clrScr();
-//   display.print("Calibrating gyro", 0, 0);
-//   display.update();
+  display.clrScr();
+  display.print("Calibrating gyro", 0, 0);
+  display.update();
 
-//   for (int cal_int = 0; cal_int < 2000; cal_int++)
-//   { //Run this code 2000 times
-//     //if(cal_int % 125 == 0) display.print();                              //Print a dot on the LCD every 125 readings
-//     readMPU6050(); //Read the raw acc and gyro data from the MPU-6050
-//     gyroOffsetX += gx;    //Add the gyro x-axis offset to the gyroOffsetX variable
-//     gyroOffsetY += gy;    //Add the gyro y-axis offset to the gyroOffsetY variable
-//     gyroOffsetZ += gz;    //Add the gyro z-axis offset to the gyroOffsetZ variable
-//     delay(3);             //Delay 3us to simulate the 250Hz program loop
-//   }
+  for (int cal_int = 0; cal_int < 500; cal_int++)
+  { 
+    // Взимаме 500 стойности
+    readMPU6050(); 
+    gyroOffsetX += rawGyro[0];    
+    gyroOffsetY += rawGyro[1];    
+    gyroOffsetZ += rawGyro[2];    
+    delay(3);                     // Забавяне от 3 микро секунди.
+  }
 
-//   gyroOffsetX /= 2000; //Divide the gyroOffsetX variable by 2000 to get the avarage offset
-//   gyroOffsetY /= 2000; //Divide the gyroOffsetY variable by 2000 to get the avarage offset
-//   gyroOffsetZ /= 2000; //Divide the gyroOffsetZ variable by 2000 to get the avarage offset
-// }
+  // изчисляваме средната стойност от събраните данни
+  gyroOffsetX /= 500; 
+  gyroOffsetY /= 500; 
+  gyroOffsetZ /= 500; 
+}
 
 void refresh()
 {
@@ -443,4 +451,100 @@ double rawToRealAcc(int16_t value)
 double rawToRealGyro(int16_t value)
 {
   return (double)value / (32768 / (250 * pow(2, gyroRange)));
+}
+
+void readButtons()
+{
+  char key = keypad.getKey();
+}
+
+void keypadEvent(KeypadEvent key)
+{
+  switch (keypad.getState())
+  {
+  case PRESSED:
+    break;
+  case RELEASED:
+    buttonPressed = key;
+  case HOLD:
+    buttonHolded = key;
+  }
+}
+
+void processButtons()
+{
+  if (!processHoldButton())
+    processPressButton();
+}
+
+bool processHoldButton()
+{
+  if (buttonHolded)
+  {
+    switch (buttonHolded)
+    {
+    case BUTTON_1:
+      calibrate();
+      break;
+    case BUTTON_2:
+      changeConnection();
+      break;
+    case BUTTON_3:
+      break;
+    case BUTTON_4:
+      break;
+    }
+    buttonHolded = 0;
+    buttonPressed = 0;
+    return true;
+  }
+  return false;
+}
+
+void processPressButton()
+{
+  if (buttonPressed)
+  {
+    switch (buttonPressed)
+    {
+    case BUTTON_1:
+      Serial.println("Resetting ...");
+      break;
+    case BUTTON_2:
+      changeRange();
+      break;
+    case BUTTON_3:
+      changeSensor();
+      break;
+    case BUTTON_4:
+      changeMode();
+      break;
+    }
+    buttonPressed = 0;
+  }
+}
+
+void calibrate()
+{
+  Serial.println("Calibrating ...");
+}
+
+void changeSensor()
+{
+  Serial.println("Changing sensors ...");
+}
+
+void changeMode()
+{
+  Serial.println("Changing mode ...");
+}
+
+void changeConnection()
+{
+  Serial.println("Changing connection ...");
+}
+
+void changeRange()
+{
+  Serial.println("Changing range ...");
 }
