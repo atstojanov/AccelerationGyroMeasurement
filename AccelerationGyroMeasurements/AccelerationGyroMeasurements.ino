@@ -70,8 +70,11 @@ int displayInterval = 500;
 OLED display(SDA, SCL, 10);
 extern uint8_t SmallFont[];
 
+VectorInt16 acc;
+
 float acc_total_vector;
 long ax, ay, az, maxax, maxay, maxaz;
+float accX, accY, accZ;
 long gx, gy, gz, maxgx, maxgy, maxgz;
 long temperature;
 long gyro_x_cal, gyro_y_cal, gyro_z_cal;
@@ -142,6 +145,16 @@ void loop()
   gy -= gyro_y_cal; //Subtract the offset calibration value from the raw gyro_y value
   gz -= gyro_z_cal; //Subtract the offset calibration value from the raw gyro_z value
 
+  accX = rawToRealAcc(ax);
+  accY = rawToRealAcc(ay);
+  accZ = rawToRealAcc(az);
+
+  Serial.print(accX);
+  Serial.print("\t");
+  Serial.print(accY);
+  Serial.print("\t");
+  Serial.println(accZ);
+  
   //  compare(ax, &maxax);
   //  compare(ay, &maxay);
   //  compare(az, &maxaz);
@@ -281,29 +294,38 @@ int16_t int_pow(int16_t base, int16_t exp)
   return result;
 }
 
-void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t _gy, int16_t _gz)
+void displayReadings()
 {
-  display.print("Acc", colPos(0), rowPos(2));
-  display.print("x=", colPos(0), rowPos(3));
-  display.print(_ax < 0 ? "-" : "", colPos(2), rowPos(3));
-  display.printNumF(abs(rawToRealAcc(_ax)), 2, colPos(3), rowPos(3));
-  display.print("y=", colPos(0), rowPos(4));
-  display.print(_ay < 0 ? "-" : "", colPos(2), rowPos(3));
-  display.printNumF(abs(rawToRealAcc(_ay)), 2, colPos(3), rowPos(4));
-  display.print("z=", colPos(0), rowPos(5));
-  display.print(_az < 0 ? "-" : "", colPos(2), rowPos(3));
-  display.printNumF(abs(rawToRealAcc(_az)), 2, colPos(3), rowPos(5));
+  //Ред 2
+  display.print("Accel", colPos(0), rowPos(2));
 
+  //Ред3
+  display.print("x=", colPos(0), rowPos(3));
+  display.print(accX < 0.0 ? "-" : "+", colPos(2), rowPos(3));
+  display.printNumF(abs(accX), 2, colPos(3), rowPos(3));
+
+  //Ред 4
+  display.print("y=", colPos(0), rowPos(4));
+  display.print(accY < 0 ? "-" : "+", colPos(2), rowPos(4));
+  display.printNumF(abs(accY), 2, colPos(3), rowPos(4));
+
+  //Ред 5
+  display.print("z=", colPos(0), rowPos(5));
+  display.print(accZ < 0 ? "-" : "+", colPos(2), rowPos(5));
+  display.printNumF(abs(accZ), 2, colPos(3), rowPos(5));
+
+  //Ред 2
   display.print("Angles", colPos(9), rowPos(2));
+  
+  //Ред 3
   display.print("roll=", colPos(9), rowPos(3));
-  display.print(angle_roll < 0 ? "-" : "", colPos(15), rowPos(3));
+  display.print(angle_roll < 0 ? "-" : "+", colPos(15), rowPos(3));
   display.printNumF(abs(angle_roll), 2, colPos(16), rowPos(3));
+  
+  //Ред 4
   display.print("pitch=", colPos(9), rowPos(4));
-  display.print(angle_pitch < 0 ? "-" : "", colPos(15), rowPos(4));
+  display.print(angle_pitch < 0 ? "-" : "+", colPos(15), rowPos(4));
   display.printNumF(abs(angle_pitch), 2, colPos(16), rowPos(4));
-  // display.print("yaw=", colPos(9), rowPos(5));
-  // display.print(angle_yaw < 0 ? "-" : "", colPos(15), rowPos(5));
-  // display.printNumF(abs(angle_yaw), 2, colPos(16), rowPos(5));
 }
 
 int rowPos(int row)
@@ -368,12 +390,12 @@ void refresh()
   switch (menuPosition)
   {
   case MENU_HOME:
-    displayReadings(ax, ay, az, gx, gy, gz);
+    displayReadings();
     display.print("MPU6050", CENTER, 0);
     display.print("Mode", 33, 63 - 8);
     break;
   case MENU_HOME_MAX:
-    displayReadings(maxax, maxay, maxaz, maxgx, maxgy, maxgz);
+    displayReadings();
     display.print("ADXL345", CENTER, 0);
     display.print("Mode", 33, 63 - 8);
     break;
