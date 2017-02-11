@@ -29,8 +29,8 @@
 #define MPU6050_RA_GYRO_CONFIG 0x1B
 #define MPU6050_RA_ACCEL_CONFIG 0x1C
 
-#define UPPER_RANGE 24576  // 75% of int16_t
-#define BOTTOM_RANGE 16384 // 50% of int16_t
+#define UPPER_RANGE 29491  // 90% 
+#define BOTTOM_RANGE 24576 // 75% 
 
 #define LED_PIN 13
 
