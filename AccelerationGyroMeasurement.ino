@@ -2,6 +2,7 @@
 #include "Keypad.h"
 #include "OLED_I2C.h"
 #include <MsTimer2.h>
+#include "helper_3dmath.h"
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
@@ -47,6 +48,8 @@
 #define UPPER_RANGE 24576  // 75% of int16_t
 #define BOTTOM_RANGE 16384 // 50% of int16_t
 
+#define GYRO_MEASUREMENT_INTERVAL 4 //miliseconds
+
 //
 #define LED_PIN 13
 
@@ -69,16 +72,14 @@ extern uint8_t SmallFont[];
 
 VectorInt16 acc;
 
-logn acc_total_vector;
-
-int16_t raw_ax, raw_ay, raw_az, maxax, maxay, maxaz;
-int16_t gx, gy, gz, maxgx, maxgy, maxgz;
-int16_t temperature;
+float acc_total_vector;
+long ax, ay, az, maxax, maxay, maxaz;
+long gx, gy, gz, maxgx, maxgy, maxgz;
+long temperature;
 long gyro_x_cal, gyro_y_cal, gyro_z_cal;
 long loop_timer;
 float angle_pitch, angle_roll, angle_yaw;
 long angle_pitch_buffer, angle_roll_buffer, angle_yaw_buffer;
-boolean set_gyro_angles;
 float angle_roll_acc, angle_pitch_acc, angle_yaw_acc;
 float angle_pitch_output, angle_roll_output;
 
@@ -165,7 +166,8 @@ void read_mpu_6050_data()
   Wire.endTransmission();                  //End the transmission
   Wire.requestFrom(MPU6050_ADDRESS, 14);   //Request 14 bytes from the MPU-6050
   while (Wire.available() < 14)
-    ;                                           //Wait until all the bytes are received
+  {
+  };                                            //Wait until all the bytes are received
   ax = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the acc_x variable
   ay = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the acc_y variable
   az = Wire.read() << 8 | Wire.read();          //Add the low and high byte to the acc_z variable
@@ -283,13 +285,13 @@ void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t
   display.print("Acc", colPos(0), rowPos(2));
   display.print("x=", colPos(0), rowPos(3));
   display.print(_ax < 0 ? "-" : "", colPos(2), rowPos(3));
-  display.printNumF(abs(convertAcc(_ax)), 2, colPos(3), rowPos(3));
+  display.printNumF(abs(rawToRealAcc(_ax)), 2, colPos(3), rowPos(3));
   display.print("y=", colPos(0), rowPos(4));
   display.print(_ay < 0 ? "-" : "", colPos(2), rowPos(3));
-  display.printNumF(abs(convertAcc(_ay)), 2, colPos(3), rowPos(4));
+  display.printNumF(abs(rawToRealAcc(_ay)), 2, colPos(3), rowPos(4));
   display.print("z=", colPos(0), rowPos(5));
   display.print(_az < 0 ? "-" : "", colPos(2), rowPos(3));
-  display.printNumF(abs(convertAcc(_az)), 2, colPos(3), rowPos(5));
+  display.printNumF(abs(rawToRealAcc(_az)), 2, colPos(3), rowPos(5));
 
   display.print("Angles", colPos(9), rowPos(2));
   display.print("roll=", colPos(9), rowPos(3));
@@ -298,9 +300,9 @@ void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t
   display.print("pitch=", colPos(9), rowPos(4));
   display.print(angle_pitch < 0 ? "-" : "", colPos(15), rowPos(4));
   display.printNumF(abs(angle_pitch), 2, colPos(16), rowPos(4));
-  display.print("yaw=", colPos(9), rowPos(5));
-  display.print(angle_yaw < 0 ? "-" : "", colPos(15), rowPos(5));
-  display.printNumF(abs(angle_yaw), 2, colPos(16), rowPos(5));
+  // display.print("yaw=", colPos(9), rowPos(5));
+  // display.print(angle_yaw < 0 ? "-" : "", colPos(15), rowPos(5));
+  // display.printNumF(abs(angle_yaw), 2, colPos(16), rowPos(5));
 }
 
 int rowPos(int row)
@@ -378,27 +380,50 @@ void refresh()
   display.update();
 }
 
-double convertAcc(int16_t value)
+double rawToRealAcc(int16_t value)
 {
-  //return roundf(((value / 16384) * pow(2,(accRange + 1)))*100.0)/100.0;
-  return (value / 16384.00) * pow(2, accRange);
+  return (double)value / (16384 / pow(2, accRange));
 }
 
-double convertGyro(int16_t value)
+double rawToRealGyro(int16_t value)
 {
-  return (value / 32768.00) * 250 * (gyroRange + 1);
+  return (double)value / (32768 / (250 * pow(2, gyroRange)));
+}
+
+double gyroReadingsToDegree(int16_t value)
+{
+  return rawToRealGyro(value) * 0.001 * GYRO_MEASUREMENT_INTERVAL;
 }
 
 void calculateAngles()
 {
-  //Accelerometer angle calculations
   acc_total_vector = sqrt((ax * ax) + (ay * ay) + (az * az)); //Calculate the total accelerometer vector
-  //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
-  angle_pitch_acc = asin((float)ax / acc_total_vector) * 57.296; //Calculate the pitch angle
-  angle_roll_acc = asin((float)ay / acc_total_vector) * -57.296; //Calculate the roll angle
-  angle_yaw_acc = asin((float)az / acc_total_vector) * 57.296;   //Calculate the yaw angle
+  // Serial.print("\t");
+  // Serial.print(ax);
+  // Serial.print("\t");
+  // Serial.print(ay);
+  // Serial.print("\t");
+  // Serial.println(az);
+  Serial.println(rawToRealGyro(gx));
 
-  angle_pitch = angle_pitch_acc;
-  angle_roll = angle_roll_acc;
-  angle_yaw = angle_yaw_acc;
+  Serial.println(acc_total_vector);
+  //The Arduino asin function is in radians
+  angle_pitch += gyroReadingsToDegree(gx);
+  angle_roll += gyroReadingsToDegree(gy);
+
+  angle_pitch_acc = asin((float)ax / acc_total_vector) * 180.0 / M_PI; //Calculate the pitch angle
+  angle_roll_acc = asin((float)ay / acc_total_vector) * 180.0 / M_PI;  //Calculate the roll angle
+  
+
+  if (setGyroAngles)
+  {
+      angle_pitch = angle_pitch * 0.995 + angle_pitch_acc * 0.005;
+      angle_roll = angle_roll * 0.995 + angle_roll_acc * 0.005;
+  }
+  else
+  {
+    angle_pitch = angle_pitch_acc;
+    angle_roll = angle_roll_acc;
+    setGyroAngles = true;
+  }
 }
