@@ -96,23 +96,23 @@ void setup()
   display.setFont(SmallFont);
 
   Wire.begin();                                                                       //Стартиране на I2C в режим мастър
-  
+
   Serial.begin(38400);                                                                //Стартиране на серийната комуникация. Скорост 38400 bps
   Serial.println("Setting some things up.");
 
   MsTimer2::set(100, interrupt);
   MsTimer2::start();
-  
+
   pinMode(LED_PIN, OUTPUT);                                                           // LED пина конфигуриран, като изход.
 
-  setup_mpu_6050_registers();                                                         //Конфигуриране на mpu_6050.                
+  setup_mpu_6050_registers();                                                         //Конфигуриране на mpu_6050.
   calibrateGyro();
 
   Serial.println("Done");
 }
 
 void loop() {
-    
+
   buttonPressed = keypad.getKey();
   switch (buttonPressed) {
     case BUTTON_1:
@@ -128,7 +128,7 @@ void loop() {
 
 
 
-//  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  //  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
   read_mpu_6050_data();
 
@@ -136,14 +136,14 @@ void loop() {
   gy -= gyro_y_cal;                                                //Subtract the offset calibration value from the raw gyro_y value
   gz -= gyro_z_cal;                                                //Subtract the offset calibration value from the raw gyro_z value
 
-//  compare(ax, &maxax);
-//  compare(ay, &maxay);
-//  compare(az, &maxaz);
-//  compare(gx, &maxgx);
-//  compare(gy, &maxgy);
-//  compare(gz, &maxgz);
-//
-//  checkRange();
+  //  compare(ax, &maxax);
+  //  compare(ay, &maxay);
+  //  compare(az, &maxaz);
+  //  compare(gx, &maxgx);
+  //  compare(gy, &maxgy);
+  //  compare(gz, &maxgz);
+  //
+  //  checkRange();
 
   calculateAngles();
 
@@ -151,37 +151,37 @@ void loop() {
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));;
 }
 
-void read_mpu_6050_data(){                                             //Subroutine for reading the raw gyro and accelerometer data
+void read_mpu_6050_data() {                                            //Subroutine for reading the raw gyro and accelerometer data
   Wire.beginTransmission(MPU6050_ADDRESS);                                        //Start communicating with the MPU-6050
   Wire.write(0x3B);                                                    //Send the requested starting register
   Wire.endTransmission();                                              //End the transmission
-  Wire.requestFrom(MPU6050_ADDRESS,14);                                           //Request 14 bytes from the MPU-6050
-  while(Wire.available() < 14);                                        //Wait until all the bytes are received
-  ax = Wire.read()<<8|Wire.read();                                     //Add the low and high byte to the acc_x variable
-  ay = Wire.read()<<8|Wire.read();                                     //Add the low and high byte to the acc_y variable
-  az = Wire.read()<<8|Wire.read();                                     //Add the low and high byte to the acc_z variable
-  temperature = Wire.read()<<8|Wire.read();                            //Add the low and high byte to the temperature variable
-  gx = Wire.read()<<8|Wire.read();                                     //Add the low and high byte to the gyro_x variable
-  gy = Wire.read()<<8|Wire.read();                                     //Add the low and high byte to the gyro_y variable
-  gz = Wire.read()<<8|Wire.read();                                    //Add the low and high byte to the gyro_z variable
+  Wire.requestFrom(MPU6050_ADDRESS, 14);                                          //Request 14 bytes from the MPU-6050
+  while (Wire.available() < 14);                                       //Wait until all the bytes are received
+  ax = Wire.read() << 8 | Wire.read();                                 //Add the low and high byte to the acc_x variable
+  ay = Wire.read() << 8 | Wire.read();                                 //Add the low and high byte to the acc_y variable
+  az = Wire.read() << 8 | Wire.read();                                 //Add the low and high byte to the acc_z variable
+  temperature = Wire.read() << 8 | Wire.read();                        //Add the low and high byte to the temperature variable
+  gx = Wire.read() << 8 | Wire.read();                                 //Add the low and high byte to the gyro_x variable
+  gy = Wire.read() << 8 | Wire.read();                                 //Add the low and high byte to the gyro_y variable
+  gz = Wire.read() << 8 | Wire.read();                                //Add the low and high byte to the gyro_z variable
 
 }
 
-void setFullScaleAccRange(uint8_t range){
+void setFullScaleAccRange(uint8_t range) {
   Wire.beginTransmission(MPU6050_ADDRESS);                                        //Start communicating with the MPU-6050
   Wire.write(0x1C);                                                    //Send the requested starting register
-  Wire.write(range<<3);                                                    //Set the requested starting register
+  Wire.write(range << 3);                                                  //Set the requested starting register
   Wire.endTransmission();                                              //End the transmission
 }
 
-void setFullScaleGyroRange(uint8_t range){
+void setFullScaleGyroRange(uint8_t range) {
   Wire.beginTransmission(MPU6050_ADDRESS);                                        //Start communicating with the MPU-6050
   Wire.write(0x1B);                                                    //Send the requested starting register
-  Wire.write(range<<3);                                                    //Set the requested starting register
-  Wire.endTransmission();                                              //End the transmission 
+  Wire.write(range << 3);                                                  //Set the requested starting register
+  Wire.endTransmission();                                              //End the transmission
 }
 
-void setup_mpu_6050_registers(){
+void setup_mpu_6050_registers() {
   //Activate the MPU-6050
   Wire.beginTransmission(MPU6050_ADDRESS);                                        //Start communicating with the MPU-6050
   Wire.write(0x6B);                                                    //Send the requested starting register
@@ -265,23 +265,38 @@ int16_t int_pow(int16_t base, int16_t exp)
   }
   return result;
 }
+
 void displayReadings(int16_t _ax, int16_t _ay, int16_t _az, int16_t _gx, int16_t _gy, int16_t _gz)
 {
-  display.print("Acc", DSP_V_POS_ACC, FONT_HEIGHT *2);
-  display.print("x=", DSP_V_POS_ACC, FONT_HEIGHT * 3);
-  display.printNumF(convertAcc(_ax), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 3);
-  display.print("y=", DSP_V_POS_ACC, FONT_HEIGHT * 4);
-  display.printNumF(convertAcc(_ay), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 4);
-  display.print("z=", DSP_V_POS_ACC, FONT_HEIGHT * 5);
-  display.printNumF(convertAcc(_az), 2, DSP_V_POS_ACC + DSP_V_DATA_OFFSET, FONT_HEIGHT * 5);
+  display.print("Acc", colPos(0), rowPos(2));
+  display.print("x=", colPos(0), rowPos(3));
+  display.print(_ax < 0 ? "-" : "", colPos(2), rowPos(3));
+  display.printNumF(abs(convertAcc(_ax)), 2, colPos(3), rowPos(3));
+  display.print("y=", colPos(0), rowPos(4));
+  display.print(_ay < 0 ? "-" : "", colPos(2), rowPos(3));
+  display.printNumF(abs(convertAcc(_ay)), 2, colPos(3), rowPos(4));
+  display.print("z=", colPos(0), rowPos(5));
+  display.print(_az < 0 ? "-" : "", colPos(2), rowPos(3));
+  display.printNumF(abs(convertAcc(_az)), 2, colPos(3), rowPos(5));
 
-  display.print("Angles", DSP_V_POS_GYRO, FONT_HEIGHT * 2);
-  display.print("roll=", DSP_V_POS_GYRO, FONT_HEIGHT * 3);
-  display.printNumF(angle_roll, 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6) , FONT_HEIGHT * 3);
-  display.print("pitch=", DSP_V_POS_GYRO, FONT_HEIGHT * 4);
-  display.printNumF(angle_pitch, 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 4);
-  display.print("yaw=", DSP_V_POS_GYRO, FONT_HEIGHT * 5);
-  display.printNumF(angle_yaw, 2, DSP_V_POS_GYRO + (FONT_WIDTH * 6), FONT_HEIGHT * 5);
+  display.print("Angles", colPos(9), rowPos(2));
+  display.print("roll=", colPos(9), rowPos(3));
+  display.print(angle_roll < 0 ? "-" : "", colPos(15), rowPos(3));
+  display.printNumF(abs(angle_roll), 2, colPos(16) , rowPos(3));
+  display.print("pitch=", colPos(9), rowPos(4));
+  display.print(angle_pitch < 0 ? "-" : "", colPos(15), rowPos(4));
+  display.printNumF(abs(angle_pitch), 2, colPos(16), rowPos(4));
+  display.print("yaw=", colPos(9), rowPos(5));
+  display.print(angle_yaw < 0 ? "-" : "", colPos(15), rowPos(5));
+  display.printNumF(abs(angle_yaw), 2, colPos(16), rowPos(5));
+}
+
+int rowPos(int row) {
+  return row * FONT_HEIGHT;
+}
+
+int colPos(int col) {
+  return col * FONT_WIDTH;
 }
 
 void displayButtons()
@@ -295,12 +310,12 @@ void displayButtons()
 }
 
 void calibrateGyro() {
- 
+
   display.clrScr();
   display.print("Calibrating gyro", 0, 0);
   display.update();
-  
-  for (int cal_int = 0; cal_int < 2000 ; cal_int ++){                  //Run this code 2000 times
+
+  for (int cal_int = 0; cal_int < 2000 ; cal_int ++) {                 //Run this code 2000 times
     //if(cal_int % 125 == 0) display.print();                              //Print a dot on the LCD every 125 readings
     read_mpu_6050_data();                                              //Read the raw acc and gyro data from the MPU-6050
     gyro_x_cal += gx;                                                  //Add the gyro x-axis offset to the gyro_x_cal variable
@@ -308,10 +323,10 @@ void calibrateGyro() {
     gyro_z_cal += gz;                                                  //Add the gyro z-axis offset to the gyro_z_cal variable
     delay(3);                                                          //Delay 3us to simulate the 250Hz program loop
   }
-  
+
   gyro_x_cal /= 2000;                                                  //Divide the gyro_x_cal variable by 2000 to get the avarage offset
   gyro_y_cal /= 2000;                                                  //Divide the gyro_y_cal variable by 2000 to get the avarage offset
-  gyro_z_cal /= 2000;                                                  //Divide the gyro_z_cal variable by 2000 to get the avarage offset  
+  gyro_z_cal /= 2000;                                                  //Divide the gyro_z_cal variable by 2000 to get the avarage offset
 }
 
 void refresh() {
@@ -324,10 +339,10 @@ void refresh() {
 
   displayButtons();
 
-//  display.print("+/-", DSP_V_POS_ACC, ROW_HIGH * 5);
-//  display.printNumI(int_pow(2, (accRange + 1)), DSP_V_POS_ACC + 18, ROW_HIGH * 5, 2);
-//  display.print("+/-", DSP_V_POS_GYRO, ROW_HIGH * 5);
-//  display.printNumI(250 * (gyroRange + 1), DSP_V_POS_GYRO + 18, ROW_HIGH * 5, 4);
+  //  display.print("+/-", DSP_V_POS_ACC, ROW_HIGH * 5);
+  //  display.printNumI(int_pow(2, (accRange + 1)), DSP_V_POS_ACC + 18, ROW_HIGH * 5, 2);
+  //  display.print("+/-", colPos(9), ROW_HIGH * 5);
+  //  display.printNumI(250 * (gyroRange + 1), colPos(9) + 18, ROW_HIGH * 5, 4);
 
   switch (menuPosition)
   {
@@ -358,11 +373,11 @@ double convertGyro(int16_t value) {
 void calculateAngles()
 {
   //Accelerometer angle calculations
-  acc_total_vector = sqrt((ax*ax)+(ay*ay)+(az*az));  //Calculate the total accelerometer vector
+  acc_total_vector = sqrt((ax * ax) + (ay * ay) + (az * az)); //Calculate the total accelerometer vector
   //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
-  angle_pitch_acc = asin((float)ax/acc_total_vector)* 57.296;       //Calculate the pitch angle
-  angle_roll_acc = asin((float)ay/acc_total_vector)* -57.296;       //Calculate the roll angle
-  angle_yaw_acc = asin((float)az/acc_total_vector)* 57.296;       //Calculate the yaw angle
+  angle_pitch_acc = asin((float)ax / acc_total_vector) * 57.296;    //Calculate the pitch angle
+  angle_roll_acc = asin((float)ay / acc_total_vector) * -57.296;    //Calculate the roll angle
+  angle_yaw_acc = asin((float)az / acc_total_vector) * 57.296;    //Calculate the yaw angle
 
   angle_pitch = angle_pitch_acc;
   angle_roll = angle_roll_acc;
