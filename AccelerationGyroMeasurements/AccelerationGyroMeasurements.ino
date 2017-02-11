@@ -69,8 +69,6 @@ int displayInterval = 500;
 OLED display(SDA, SCL, 10);
 extern uint8_t SmallFont[];
 
-VectorInt16 acc;
-
 float acc_total_vector;
 long ax, ay, az, maxax, maxay, maxaz;
 long gx, gy, gz, maxgx, maxgy, maxgz;
@@ -156,8 +154,9 @@ void loop()
 
   refresh();
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  while(micros() - loopTimer < 4000);                                 //Wait until the loopTimer reaches 4000us (250Hz) before starting the next loop
-  loopTimer = micros();                                               //Reset the loop timer
+  while (micros() - loopTimer < 4000)
+    ;                   //Wait until the loopTimer reaches 4000us (250Hz) before starting the next loop
+  loopTimer = micros(); //Reset the loop timer
 }
 
 void read_mpu_6050_data()
@@ -403,14 +402,16 @@ void calculateAngles()
   angle_pitch += gyroReadingsToDegree(gx);
   angle_roll += gyroReadingsToDegree(gy);
 
-  angle_pitch_acc = asin((float)ax / acc_total_vector) * RAD_TO_DEG; //Calculate the pitch angle
-  angle_roll_acc = -1 * asin((float)ay / acc_total_vector) * RAD_TO_DEG;  //Calculate the roll angle
-  
+  angle_pitch += angle_roll * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD); //If the IMU has yawed transfer the roll angle to the pitch angel
+  angle_roll -= angle_pitch * sin(gyroReadingsToDegree(gz) * DEG_TO_RAD);
+
+  angle_pitch_acc = asin((float)ax / acc_total_vector) * RAD_TO_DEG;     //Calculate the pitch angle
+  angle_roll_acc = -1 * asin((float)ay / acc_total_vector) * RAD_TO_DEG; //Calculate the roll angle
 
   if (setGyroAngles)
   {
-      angle_pitch = angle_pitch * 0.9995 + angle_pitch_acc * 0.0005;
-      angle_roll = angle_roll * 0.9995 + angle_roll_acc * 0.0005;
+    angle_pitch = angle_pitch * 0.9995 + angle_pitch_acc * 0.0005;
+    angle_roll = angle_roll * 0.9995 + angle_roll_acc * 0.0005;
   }
   else
   {
