@@ -601,12 +601,12 @@ void sendData()
 void readSensor()
 {
   readSensorNoOffset();
-  rawAcc[0] += accOffsetX;
-  rawAcc[1] += accOffsetY;
-  rawAcc[2] += accOffsetZ;
-  rawGyro[0] += gyroOffsetX;
-  rawGyro[1] += gyroOffsetY;
-  rawGyro[2] += gyroOffsetZ;
+  rawAcc[0] -= accOffsetX;
+  rawAcc[1] -= accOffsetY;
+  rawAcc[2] -= accOffsetZ;
+  rawGyro[0] -= gyroOffsetX;
+  rawGyro[1] -= gyroOffsetY;
+  rawGyro[2] -= gyroOffsetZ;
 }
 
 void readSensorNoOffset()
