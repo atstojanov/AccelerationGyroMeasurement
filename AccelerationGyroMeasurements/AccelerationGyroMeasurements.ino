@@ -408,24 +408,42 @@ void reset()
 // показване на данните на екрана
 void displayReadings()
 {
+  static int i;
 
-  display.print("Accel", colPos(0), rowPos(2));
-  display.print("Angles", colPos(9), rowPos(2));
-
-  for (int i = 0; i < 3; i++)
+  display.print("Accel", colPos(0), rowPos(1));
+  display.print("[g]", colPos(1), rowPos(2));
+  
+  for (i = 0; i < 3; i++)
   {
-    display.print(labelsXYZ[i], colPos(0), rowPos(3 + i));
+    display.print(labelsXYZ[i], colPos(0), rowPos(4 + i));
     if (realAcc[i] < 0.0)
-      display.print("-", colPos(2), rowPos(3 + i));
-    display.printNumF(abs(realAcc[i]), 2, colPos(3), rowPos(3 + i));
+      display.print("-", colPos(2), rowPos(4 + i));
+    display.printNumF(abs(realAcc[i]), 2, colPos(3), rowPos(4 + i));
   }
 
-  for (int i = 0; i < 2; i++)
+  if (isRawMode())
   {
-    display.print(labelsYPR[i], colPos(9), rowPos(3 + i));
-    if (Awz[i] < 0.0)
-      display.print("-", colPos(15), rowPos(3 + i));
-    display.printNumF(abs(Awz[i]), 2, colPos(16), rowPos(3 + i));
+    display.print("Velocity", colPos(9), rowPos(1));
+    display.print("[deg/s]", colPos(19), rowPos(2)); 
+    for (i = 0; i < 3; i++)
+    {
+      display.print(labelsXYZ[i], colPos(9), rowPos(4 + i));
+      if (realGyro[i] < 0.0)
+        display.print("-", colPos(11), rowPos(4 + i));
+      display.printNumF(abs(realGyro[i]), 2, colPos(12), rowPos(4 + i));
+    }
+  }
+  else
+  {
+    display.print("Angles", colPos(9), rowPos(1));
+    display.print("[deg]", colPos(9), rowPos(2));
+    for (i = 0; i < 2; i++)
+    {
+      display.print(labelsYPR[i], colPos(9), rowPos(4 + i));
+      if (Awz[i] < 0.0)
+        display.print("-", colPos(15), rowPos(4 + i));
+      display.printNumF(abs(Awz[i]), 2, colPos(16), rowPos(4 + i));
+    }
   }
 }
 
