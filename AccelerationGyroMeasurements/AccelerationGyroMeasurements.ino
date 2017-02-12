@@ -40,8 +40,11 @@
 
 #define LED_PIN 13
 
+extern uint8_t plusminus[];
+
 char *labelsXYZ[] = { "x=", "y=", "z=" };
 char *labelsYPR[] = { "p=", "r=", "y=" };
+char *accRanges[] = { "2g", "4g", "8g", "16g" };
 
 // Брой редове на клавиатурата
 const byte ROWS = 2;
@@ -91,7 +94,8 @@ bool firstSample = true; // Първо изчисление или не?
 
 int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
 
-int mode = 0;
+byte mode = 0;
+bool connection;
 
 void interrupt()
 {
@@ -377,8 +381,6 @@ void reset()
 		rawAcc[i] = 0;
 		rawGyro[i] = 0;
 	}
-	accRange = 0;
-	gyroRange = 3;
 	setFullScaleAccRange(accRange);
 	setFullScaleGyroRange(gyroRange);
 	setADXL345Range(accRange);
@@ -390,7 +392,7 @@ void displayReadings()
 	int i;
 
 	display.print(F("Accel"), colPos(0), rowPos(2));
-	display.print(F("[g]"), colPos(1), rowPos(3));
+	displayAccRange(0, 3);
 
 	for (i = 0; i < 3; i++)
 	{
@@ -435,6 +437,17 @@ void displayNumberF(float v, int col, int row, int length)
 	display.printNumF(abs(v), 2, colPos(col + 1), rowPos(row), '.', length, '0');
 }
 
+void displayPlusMinus(int col, int row)
+{
+	display.drawBitmap(colPos(col), rowPos(row), plusminus, 6, 8);
+}
+
+void displayAccRange(int col, int row)
+{
+	displayPlusMinus(col, row);
+	display.print(accRanges[accRange], colPos(col + 1), rowPos(row));
+}
+
 // изчисляване на позицията на редовете на екрана
 int rowPos(int row)
 {
@@ -465,13 +478,15 @@ void calibrate()
 
 	display.print(F("Calibrating"), colPos(0), rowPos(0));
 	display.print(F("%"), colPos(3), rowPos(2));
+	displayAccRange(11, 1);
+
 	if (getSensorID() == MPU6050_ID)
 	{
-		display.print(F("MPU6050"), colPos(0), rowPos(1));
+		display.print(F("MPU6050 - "), colPos(0), rowPos(1));
 	}
 	else
 	{
-		display.print(F("ADXL345"), colPos(0), rowPos(1));
+		display.print(F("ADXL345 - "), colPos(0), rowPos(1));
 	}
 
 	int percent = 0;
@@ -607,7 +622,16 @@ void changeConnection()
 
 void changeRange()
 {
-
+	if (accRange == 3)
+	{
+		accRange = 0;
+	}
+	else
+	{
+		accRange++;
+	}
+	reset();
+	calibrate();
 }
 
 void sendData()
