@@ -24,18 +24,18 @@
 #define MENU_HOME 1
 #define MENU_HOME_MAX 2
 
-#define ADXL345_ID                  0x01
-#define ADXL345_ADDRESS             0x53
-#define ADXL345_RA_POWER_CTL        0x2D
-#define ADXL345_RA_DATA_FORMAT      0x31
-#define ADXL345_RA_DATAX0           0x32
-#define ADXL345_RA_DATAX1           0x33
-#define ADXL345_RA_DATAY0           0x34
-#define ADXL345_RA_DATAY1           0x35
-#define ADXL345_RA_DATAZ0           0x36
-#define ADXL345_RA_DATAZ1           0x37
+#define ADXL345_ID 0x01
+#define ADXL345_ADDRESS 0x53
+#define ADXL345_RA_POWER_CTL 0x2D
+#define ADXL345_RA_DATA_FORMAT 0x31
+#define ADXL345_RA_DATAX0 0x32
+#define ADXL345_RA_DATAX1 0x33
+#define ADXL345_RA_DATAY0 0x34
+#define ADXL345_RA_DATAY1 0x35
+#define ADXL345_RA_DATAZ0 0x36
+#define ADXL345_RA_DATAZ1 0x37
 
-#define MPU6050_ID                  0x00
+#define MPU6050_ID 0x00
 #define MPU6050_ADDRESS 0x68
 #define MPU6050_RA_GYRO_CONFIG 0x1B
 #define MPU6050_RA_ACCEL_CONFIG 0x1C
@@ -88,9 +88,6 @@ long accOffsetX, accOffsetY, accOffsetZ;
 long gyroOffsetX, gyroOffsetY, gyroOffsetZ;
 
 volatile bool updateDisplayNeeded = false; // показва дали данните на дисплея трябва да се опреснят.
-volatile bool needCalibration = false;
-volatile byte buttonPressed = 0;
-volatile byte buttonHolded = 0;
 
 bool firstSample = true; // Първо изчисление или не?
 
@@ -98,13 +95,18 @@ int accRange = 0, gyroRange = 3; // текущ обхват на акселер�
 
 char ADXL345Name[] = "ADXL345";
 char MPU6050Name[] = "MPU6050";
+//char *modes[] = {"Estimates", "Max estimates", "RAW", "Max RAW" };
 
-struct {
+int mode = 0;
+// char keyPressed;
+// bool holdButtonProcessing = false;
+
+struct
+{
   byte id; // 0 MPU6050; 1 ADXL345
   char *name;
   int gRange;
   int aRange;
-
 } sensor;
 
 void interrupt()
@@ -131,7 +133,7 @@ void setup()
 
   //Конфигуриране на MPU6050.
   setupMPU6050();
-  
+
   //Конфигуриране на ADXL345.
   setupADXL345();
 
@@ -139,7 +141,6 @@ void setup()
   calibrate();
 
   //Конфигуриране на клавиатурата
-  keypad.addEventListener(keypadEvent);
   keypad.setHoldTime(1000);
 
   wGyro = 10;
@@ -159,9 +160,7 @@ void loop()
 {
   // Прочита се състоянието на бутоните
   readButtons();
-  // Отработва се състояниет на бутоните, ако има натиснат или задържан бутон
-  processButtons();
-  // чете се сензора 
+  // чете се сензора
   readSensor();
   // Конвертиране на данните от чист вид в удобен за ползавне
   // От акселерометъра в g.
@@ -169,7 +168,7 @@ void loop()
   rawToReal();
   // Изчислява се наклона на устройството.
   getEstimatedInclination();
-  
+
   // Опреснява се информацията на дисплея
   updateDisplay();
 
@@ -330,9 +329,9 @@ void readMPU6050()
   rawGyro[2] = Wire.read() << 8 | Wire.read();
 }
 
-void setupADXL345() 
+void setupADXL345()
 {
- 
+
   Wire.beginTransmission(ADXL345_ADDRESS);
   Wire.write(ADXL345_RA_POWER_CTL);
   Wire.write(0x00);
@@ -340,7 +339,7 @@ void setupADXL345()
   // включване на акселерометъра в режим на измерване
   Wire.beginTransmission(ADXL345_ADDRESS);
   Wire.write(ADXL345_RA_POWER_CTL);
-  Wire.write(0x18); 
+  Wire.write(0x18);
   Wire.endTransmission();
   setADXL345Range(accRange);
 }
@@ -364,7 +363,7 @@ void readADXL345()
   {
   };
   // Измерените стойности от сензора са 12 битови. Четенето по I2C е на части от по 8 бита.
-  // за това се налага събирането на два последователни байта в една стойностт. 
+  // за това се налага събирането на два последователни байта в една стойностт.
   rawAcc[0] = Wire.read() | Wire.read() << 8;
   rawAcc[1] = Wire.read() | Wire.read() << 8;
   rawAcc[2] = Wire.read() | Wire.read() << 8;
@@ -440,27 +439,37 @@ void displayButtons()
   // display.print("Rst", 97, 63 - 8);
 }
 
-void calibrateGyro()
+void calibrateSensor()
 {
-
   display.clrScr();
-  display.print("Calibrating gyro", 0, 0);
+  display.print("Calibrating MPU6050", CENTER, rowPos(0));
   display.update();
-
+  int percent = 0;
+  // Взимаме 500 стойности
   for (int cal_int = 0; cal_int < 500; cal_int++)
-  { 
-    // Взимаме 500 стойности
-    readMPU6050(); 
-    gyroOffsetX += rawGyro[0];    
-    gyroOffsetY += rawGyro[1];    
-    gyroOffsetZ += rawGyro[2];    
-    delay(3);                     // Забавяне от 3 микро секунди.
+  {
+    if (cal_int % 5 == 0)
+    {
+      display.printNumI(++percent, CENTER, rowPos(1));
+      display.update();
+    }
+    readMPU6050();
+    gyroOffsetX += rawGyro[0];
+    gyroOffsetY += rawGyro[1];
+    gyroOffsetZ += rawGyro[2];
+    accOffsetX += rawAcc[0];
+    accOffsetY += rawAcc[1];
+    accOffsetZ += rawAcc[2];
+    delay(3); // Забавяне от 3 микро секунди.
   }
 
   // изчисляваме средната стойност от събраните данни
-  gyroOffsetX /= 500; 
-  gyroOffsetY /= 500; 
-  gyroOffsetZ /= 500; 
+  gyroOffsetX /= 500;
+  gyroOffsetY /= 500;
+  gyroOffsetZ /= 500;
+  accOffsetX /= 500;
+  accOffsetY /= 500;
+  accOffsetZ /= 500;
 }
 
 void updateDisplay()
@@ -475,8 +484,8 @@ void updateDisplay()
   //displayButtons();
 
   displayReadings();
-  display.print(sensor.name, CENTER, 0);
-    
+  display.print(sensor.name, CENTER, rowPos(0));
+  //display.print(modes[mode], CENTER, rowPos(1));
   display.update();
 }
 
@@ -495,77 +504,26 @@ double rawToRealGyro(int16_t value)
 void readButtons()
 {
   char key = keypad.getKey();
-}
-
-void keypadEvent(KeypadEvent key)
-{
-  switch (keypad.getState())
+  switch (key)
   {
-  case PRESSED:
+  case BUTTON_1:
+    calibrate();
     break;
-  case RELEASED:
-    buttonPressed = key;
-  case HOLD:
-    buttonHolded = key;
-  }
-}
-
-void processButtons()
-{
-  if (!processHoldButton())
-    processPressButton();
-}
-
-bool processHoldButton()
-{
-  if (buttonHolded)
-  {
-    switch (buttonHolded)
-    {
-    case BUTTON_1:
-      calibrate();
-      break;
-    case BUTTON_2:
-      changeConnection();
-      break;
-    case BUTTON_3:
-      break;
-    case BUTTON_4:
-      break;
-    }
-    buttonHolded = 0;
-    buttonPressed = 0;
-    return true;
-  }
-  return false;
-}
-
-void processPressButton()
-{
-  if (buttonPressed)
-  {
-    switch (buttonPressed)
-    {
-    case BUTTON_1:
-      Serial.println("Resetting ...");
-      break;
-    case BUTTON_2:
-      changeRange();
-      break;
-    case BUTTON_3:
-      changeSensor();
-      break;
-    case BUTTON_4:
-      changeMode();
-      break;
-    }
-    buttonPressed = 0;
+  case BUTTON_2:
+    changeRange();
+    break;
+  case BUTTON_3:
+    changeConnection();
+    break;
+  case BUTTON_4:
+    changeMode();
+    break;
   }
 }
 
 void calibrate()
 {
-  Serial.println("Calibrating ...");
+  calibrateSensor();
 }
 
 void changeSensor()
@@ -576,6 +534,12 @@ void changeSensor()
 void changeMode()
 {
   Serial.println("Changing mode ...");
+  if (mode == 3)
+  {
+    mode = 0;
+  }
+  else
+    mode++;
 }
 
 void changeConnection()
@@ -590,27 +554,28 @@ void changeRange()
 
 void sendData()
 {
-
 }
 
 void readSensor()
 {
-  if(sensor.id == MPU6050_ID)
+  if (sensor.id == MPU6050_ID)
+  {
     readMPU6050();
+  }
   else
     readADXL345();
 }
 
 void setActiveSensor(byte id)
 {
-  if(id == MPU6050_ID)
+  if (id == MPU6050_ID)
   {
     sensor.id = id;
     sensor.name = MPU6050Name;
     sensor.gRange = 32768;
     sensor.aRange = 16384;
   }
-  else if(id == ADXL345_ID)
+  else if (id == ADXL345_ID)
   {
     sensor.id = id;
     sensor.name = ADXL345Name;
