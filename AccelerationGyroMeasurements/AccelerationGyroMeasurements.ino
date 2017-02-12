@@ -16,11 +16,6 @@
 #define DISPLAY_WIDTH_PIXELS 128
 #define DISPLAY_HEIGHT_PIXELS 64
 
-#define BUTTON_1 '1'
-#define BUTTON_2 '2'
-#define BUTTON_3 '3'
-#define BUTTON_4 '4'
-
 #define MENU_HOME 1
 #define MENU_HOME_MAX 2
 
@@ -96,21 +91,7 @@ bool firstSample = true; // Първо изчисление или не?
 
 int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
 
-// char ADXL345Name[] = "ADXL345";
-// char MPU6050Name[] = "MPU6050";
-//char *modes[] = {"Estimates", "Max estimates", "RAW", "Max RAW" };
-
 int mode = 0;
-// char keyPressed;
-// bool holdButtonProcessing = false;
-
-// struct
-// {
-//   byte id; // 0 MPU6050; 1 ADXL345
-//   char *name;
-//   int gRange;
-//   int aRange;
-// } sensor;
 
 void interrupt()
 {
