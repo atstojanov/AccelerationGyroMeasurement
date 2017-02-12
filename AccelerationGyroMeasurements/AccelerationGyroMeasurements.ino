@@ -560,11 +560,6 @@ void calibrate()
   calibrateSensor();
 }
 
-void changeSensor()
-{
-  Serial.println(F("Changing sensors ..."));
-}
-
 void changeMode()
 {
   if (mode == 3)
