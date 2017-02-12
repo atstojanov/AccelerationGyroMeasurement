@@ -386,10 +386,20 @@ void rawToReal()
 void reset()
 {
   firstSample = true;
+  for (int i = 0; i < 3; i++)
+  {
+    RwAcc[i] = 0;
+    RwGyro[i] = 0;
+    Awz[i] = 0;
+    RwEst[i] = 0;
+    rawAcc[i] = 0;
+    rawGyro[i] = 0;
+  }
   accRange = 0;
   gyroRange = 3;
   setFullScaleAccRange(accRange);
   setFullScaleGyroRange(gyroRange);
+  setADXL345Range(accRange);
 }
 
 // показване на данните на екрана
