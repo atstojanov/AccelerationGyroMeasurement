@@ -468,7 +468,7 @@ void calibrateSensor()
     gyroOffsetZ += rawGyro[2];
     accOffsetX += rawAcc[0];
     accOffsetY += rawAcc[1];
-    accOffsetZ += (rawAcc[2] - 1); // z винаги показва 1.
+    accOffsetZ += (rawAcc[2] - getAccLSB());
     delay(3);                      // Забавяне от 3 микро секунди.
   }
 
