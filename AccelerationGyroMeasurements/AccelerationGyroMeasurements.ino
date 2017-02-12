@@ -441,9 +441,6 @@ void displayButtons()
 
 void calibrateSensor()
 {
-  display.clrScr();
-  display.print("Calibrating MPU6050", CENTER, rowPos(0));
-  display.update();
   int percent = 0;
   // Взимаме 500 стойности
   for (int cal_int = 0; cal_int < 500; cal_int++)
@@ -453,7 +450,7 @@ void calibrateSensor()
       display.printNumI(++percent, CENTER, rowPos(1));
       display.update();
     }
-    readMPU6050();
+    readSensorNoOffset();
     gyroOffsetX += rawGyro[0];
     gyroOffsetY += rawGyro[1];
     gyroOffsetZ += rawGyro[2];
@@ -523,6 +520,13 @@ void readButtons()
 
 void calibrate()
 {
+  display.clrScr();
+  if(sensor.id == MPU6050_ID)
+    display.print("Calibrating MPU6050", CENTER, rowPos(0));
+  else
+    display.print("Calibrating ADXL345", CENTER, rowPos(0));
+  display.update();
+
   calibrateSensor();
 }
 
@@ -557,6 +561,17 @@ void sendData()
 }
 
 void readSensor()
+{
+  readSensorNoOffset();
+  rawAcc[0] += accOffsetX;
+  rawAcc[1] += accOffsetY;
+  rawAcc[2] += accOffsetZ;
+  rawGyro[0] += gyroOffsetX;
+  rawGyro[1] += gyroOffsetY;
+  rawGyro[2] += gyroOffsetZ;
+}
+
+void readSensorNoOffset()
 {
   if (sensor.id == MPU6050_ID)
   {
