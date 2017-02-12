@@ -100,6 +100,7 @@ void interrupt()
 
 void setup()
 {
+
   //Стартиране на серийната комуникация. Скорост 38400 bps
   Serial.begin(38400);
   // Издаване на съобщение за старт на инициализацията
@@ -108,6 +109,10 @@ void setup()
   // Стартиране на връзката с дисплея.
   display.begin();
   display.setFont(SmallFont);
+  
+  //Стартиране на брояча за опресняване на дисплея
+  MsTimer2::set(100, interrupt);
+  MsTimer2::start();
 
   //Стартиране на I2C в режим мастър.
   Wire.begin();
@@ -128,13 +133,6 @@ void setup()
   keypad.setHoldTime(1000);
 
   wGyro = 10;
-
-  //Стартиране на брояча за опресняване на дисплея
-  MsTimer2::set(100, interrupt);
-  MsTimer2::start();
-
-  // // избор на активен сензор
-  // setActiveSensor(MPU6050_ID);
 
   //Съобщение в серийната конзола, че инициализацията е завършила
   Serial.println(F("Done!"));
