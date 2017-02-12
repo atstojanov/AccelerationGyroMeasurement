@@ -24,8 +24,19 @@
 #define MENU_HOME 1
 #define MENU_HOME_MAX 2
 
-#define MPU6050_ADDRESS 0x68
+#define ADXL345_ID                  0x01
+#define ADXL345_ADDRESS             0x53
+#define ADXL345_RA_POWER_CTL        0x2D
+#define ADXL345_RA_DATA_FORMAT      0x31
+#define ADXL345_RA_DATAX0           0x32
+#define ADXL345_RA_DATAX1           0x33
+#define ADXL345_RA_DATAY0           0x34
+#define ADXL345_RA_DATAY1           0x35
+#define ADXL345_RA_DATAZ0           0x36
+#define ADXL345_RA_DATAZ1           0x37
 
+#define MPU6050_ID                  0x00
+#define MPU6050_ADDRESS 0x68
 #define MPU6050_RA_GYRO_CONFIG 0x1B
 #define MPU6050_RA_ACCEL_CONFIG 0x1C
 
@@ -83,9 +94,18 @@ volatile byte buttonHolded = 0;
 
 bool firstSample = true; // Първо изчисление или не?
 
-int menuPosition = MENU_HOME;
-
 int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
+
+char ADXL345Name[] = "ADXL345";
+char MPU6050Name[] = "MPU6050";
+
+struct {
+  byte id; // 0 MPU6050; 1 ADXL345
+  char *name;
+  int gRange;
+  int aRange;
+
+} sensor;
 
 void interrupt()
 {
@@ -127,6 +147,9 @@ void setup()
   //Стартиране на брояча за опресняване на дисплея
   MsTimer2::set(100, interrupt);
   MsTimer2::start();
+
+  // избор на активен сензор
+  setActiveSensor(MPU6050_ID);
 
   //Съобщение в серийната конзола, че инициализацията е завършила
   Serial.println("Done!");
@@ -307,6 +330,50 @@ void readMPU6050()
   rawGyro[2] = Wire.read() << 8 | Wire.read();
 }
 
+void setupADXL345() 
+{
+ 
+  Wire.beginTransmission(ADXL345_ADDRESS);
+  Wire.write(ADXL345_RA_POWER_CTL);
+  Wire.write(0x00);
+  Wire.endTransmission();
+  // включване на акселерометъра в режим на измерване
+  Wire.beginTransmission(ADXL345_ADDRESS);
+  Wire.write(ADXL345_RA_POWER_CTL);
+  Wire.write(0x18); 
+  Wire.endTransmission();
+  setADXL345Range(accRange);
+}
+
+void setADXL345Range(uint8_t range)
+{
+  Wire.beginTransmission(ADXL345_ADDRESS);
+  Wire.write(ADXL345_RA_DATA_FORMAT);
+  Wire.write(range);
+  Wire.endTransmission();
+}
+
+void readADXL345()
+{
+  // Начало на комуникацията с MPU-6050 по I2C.
+  Wire.beginTransmission(ADXL345_ADDRESS);
+  Wire.write(ADXL345_RA_DATAX0);                      // Изпращане на адреса на регистъра от който ще се чете
+  Wire.endTransmission();                // Край на предааването
+  Wire.requestFrom(ADXL345_ADDRESS, 6); // Заявка за 6 байта от ADXL345
+  while (Wire.available() < 6)          // Изчакване докато бойтовете са получени
+  {
+  };
+  // Измерените стойности от сензора са 16 битови. Четенето по I2C е на части от по 8 бита.
+  // за това се налага събирането на два последователни байта в една стойностт.
+  rawAcc[0] = Wire.read() | Wire.read() << 8;
+  rawAcc[1] = Wire.read() | Wire.read() << 8;
+  rawAcc[2] = Wire.read() | Wire.read() << 8;
+  temperature = Wire.read() << 8 | Wire.read();
+  rawGyro[0] = 0;
+  rawGyro[1] = 0;
+  rawGyro[2] = 0;
+}
+
 void rawToReal()
 {
   for (int i = 0; i < 3; i++)
@@ -398,7 +465,6 @@ void calibrateGyro()
 
 void updateDisplay()
 {
-
   if (!updateDisplayNeeded)
     return;
 
@@ -408,32 +474,22 @@ void updateDisplay()
 
   displayButtons();
 
-  switch (menuPosition)
-  {
-  case MENU_HOME:
-    displayReadings();
-    display.print("MPU6050", CENTER, 0);
-    display.print("Mode", 33, 63 - 8);
-    break;
-  case MENU_HOME_MAX:
-    displayReadings();
-    display.print("ADXL345", CENTER, 0);
-    display.print("Mode", 33, 63 - 8);
-    break;
-  }
+  displayReadings();
+  display.print(sensor.name, CENTER, 0);
+    
   display.update();
 }
 
 // изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
 double rawToRealAcc(int16_t value)
 {
-  return (double)value / (16384 / pow(2, accRange));
+  return (double)value / (sensor.aRange / pow(2, accRange));
 }
 
 // изчисляване на показанията на жироскопа в deg/s. Обхвата се взема в предвид.
 double rawToRealGyro(int16_t value)
 {
-  return (double)value / (32768 / (250 * pow(2, gyroRange)));
+  return (double)value / (sensor.gRange / (250 * pow(2, gyroRange)));
 }
 
 void readButtons()
@@ -530,4 +586,35 @@ void changeConnection()
 void changeRange()
 {
   Serial.println("Changing range ...");
+}
+
+void sendData()
+{
+
+}
+
+void readSensor()
+{
+  if(sensor.id == MPU6050_ID)
+    readMPU6050();
+  else
+    readADXL345();
+}
+
+void setActiveSensor(byte id)
+{
+  if(id == MPU6050_ID)
+  {
+    sensor.id = id;
+    sensor.name = MPU6050Name;
+    sensor.gRange = 32768;
+    sensor.aRange = 16384;
+  }
+  else if(id == ADXL345_ID)
+  {
+    sensor.id = id;
+    sensor.name = ADXL345Name;
+    sensor.gRange = 512; //не може да бъде нула
+    sensor.aRange = 256;
+  }
 }
