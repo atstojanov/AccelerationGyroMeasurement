@@ -432,12 +432,12 @@ int colPos(int col)
 // показване на най-долния ред с текст над бутоните.
 void displayButtons()
 {
-  display.drawRect(0, 63 - 10, 127, 63);
-  display.drawLine(31, 63 - 10, 31, 63);
-  display.drawLine(63, 63 - 10, 63, 63);
-  display.drawLine(95, 63 - 10, 95, 63);
-  display.print("Mode", 2, 63 - 8);
-  display.print("Rst", 97, 63 - 8);
+  // display.drawRect(0, 63 - 10, 127, 63);
+  // display.drawLine(31, 63 - 10, 31, 63);
+  // display.drawLine(63, 63 - 10, 63, 63);
+  // display.drawLine(95, 63 - 10, 95, 63);
+  // display.print("Mode", 2, 63 - 8);
+  // display.print("Rst", 97, 63 - 8);
 }
 
 void calibrateGyro()
@@ -472,7 +472,7 @@ void updateDisplay()
 
   display.clrScr();
 
-  displayButtons();
+  //displayButtons();
 
   displayReadings();
   display.print(sensor.name, CENTER, 0);
