@@ -583,7 +583,7 @@ void readButtons()
 
 void changeMode()
 {
-	if (mode == 3)
+	if (mode == 2)
 	{
 		mode = 0;
 	}
