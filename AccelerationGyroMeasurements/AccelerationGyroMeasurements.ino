@@ -122,7 +122,7 @@ void setup()
   //Стартиране на серийната комуникация. Скорост 38400 bps
   Serial.begin(38400);
   // Издаване на съобщение за старт на инициализацията
-  Serial.println("Initialization ...");
+  Serial.println(F("Initialization ..."));
 
   // Стартиране на връзката с дисплея.
   display.begin();
@@ -156,7 +156,7 @@ void setup()
   // setActiveSensor(MPU6050_ID);
 
   //Съобщение в серийната конзола, че инициализацията е завършила
-  Serial.println("Done!");
+  Serial.println(F("Done!"));
 }
 
 void loop()
@@ -410,38 +410,38 @@ void displayReadings()
 {
   static int i;
 
-  display.print("Accel", colPos(0), rowPos(1));
-  display.print("[g]", colPos(1), rowPos(2));
+  display.print(F("Accel"), colPos(0), rowPos(1));
+  display.print(F("[g]"), colPos(1), rowPos(2));
   
   for (i = 0; i < 3; i++)
   {
     display.print(labelsXYZ[i], colPos(0), rowPos(4 + i));
     if (realAcc[i] < 0.0)
-      display.print("-", colPos(2), rowPos(4 + i));
+      display.print(F("-"), colPos(2), rowPos(4 + i));
     display.printNumF(abs(realAcc[i]), 2, colPos(3), rowPos(4 + i));
   }
 
   if (isRawMode())
   {
-    display.print("Velocity", colPos(9), rowPos(1));
-    display.print("[deg/s]", colPos(19), rowPos(2)); 
+    display.print(F("Velocity"), colPos(9), rowPos(1));
+    display.print(F("[deg/s]"), colPos(19), rowPos(2)); 
     for (i = 0; i < 3; i++)
     {
       display.print(labelsXYZ[i], colPos(9), rowPos(4 + i));
       if (realGyro[i] < 0.0)
-        display.print("-", colPos(11), rowPos(4 + i));
+        display.print(F("-"), colPos(11), rowPos(4 + i));
       display.printNumF(abs(realGyro[i]), 2, colPos(12), rowPos(4 + i));
     }
   }
   else
   {
-    display.print("Angles", colPos(9), rowPos(1));
-    display.print("[deg]", colPos(9), rowPos(2));
+    display.print(F("Angles"), colPos(9), rowPos(1));
+    display.print(F("[deg]"), colPos(9), rowPos(2));
     for (i = 0; i < 2; i++)
     {
       display.print(labelsYPR[i], colPos(9), rowPos(4 + i));
       if (Awz[i] < 0.0)
-        display.print("-", colPos(15), rowPos(4 + i));
+        display.print(F("-"), colPos(15), rowPos(4 + i));
       display.printNumF(abs(Awz[i]), 2, colPos(16), rowPos(4 + i));
     }
   }
@@ -511,11 +511,11 @@ void updateDisplay()
 
   if (getSensorID() == MPU6050_ID)
   {
-    display.print("MPU6050", CENTER, rowPos(0));
+    display.print(F("MPU6050"), CENTER, rowPos(0));
   }
   else
   {
-    display.print("ADXL345", CENTER, rowPos(0));
+    display.print(F("ADXL345"), CENTER, rowPos(0));
   }
   displayReadings();
 
@@ -558,9 +558,9 @@ void calibrate()
 {
   display.clrScr();
   if (getSensorID() == MPU6050_ID)
-    display.print("Calibrating MPU6050", CENTER, rowPos(0));
+    display.print(F("Calibrating MPU6050"), CENTER, rowPos(0));
   else
-    display.print("Calibrating ADXL345", CENTER, rowPos(0));
+    display.print(F("Calibrating ADXL345"), CENTER, rowPos(0));
   display.update();
 
   calibrateSensor();
@@ -568,7 +568,7 @@ void calibrate()
 
 void changeSensor()
 {
-  Serial.println("Changing sensors ...");
+  Serial.println(F("Changing sensors ..."));
 }
 
 void changeMode()
@@ -592,12 +592,12 @@ void changeMode()
 
 void changeConnection()
 {
-  Serial.println("Changing connection ...");
+  Serial.println(F("Changing connection ..."));
 }
 
 void changeRange()
 {
-  Serial.println("Changing range ...");
+  Serial.println(F("Changing range ..."));
 }
 
 void sendData()
