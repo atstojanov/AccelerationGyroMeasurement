@@ -41,7 +41,7 @@
 #define LED_PIN 13
 
 char *labelsXYZ[] = {"x=", "y=", "z="};
-char *labelsYPR[] = {"pitch=", "roll=", "yaw="};
+char *labelsYPR[] = {"p=", "r=", "y="};
 
 // Брой редове на клавиатурата
 const byte ROWS = 2;
@@ -389,41 +389,50 @@ void displayReadings()
 {
   int i;
 
-  display.print(F("Accel"), colPos(0), rowPos(1));
-  display.print(F("[g]"), colPos(1), rowPos(2));
+  display.print(F("Accel"), colPos(0), rowPos(2));
+  display.print(F("[g]"), colPos(1), rowPos(3));
   
   for (i = 0; i < 3; i++)
   {
-    display.print(labelsXYZ[i], colPos(0), rowPos(4 + i));
-    if (realAcc[i] < 0.0)
-      display.print(F("-"), colPos(2), rowPos(4 + i));
-    display.printNumF(abs(realAcc[i]), 2, colPos(3), rowPos(4 + i));
+	display.print(labelsXYZ[i], colPos(0), rowPos(4 + i));
+	displayNumberF(realAcc[i], 2, 4 + i, 5);
   }
 
   if (isRawMode())
   {
-    display.print(F("Velocity"), colPos(9), rowPos(1));
-    display.print(F("[deg/s]"), colPos(10), rowPos(2)); 
+    display.print(F("Velocity"), colPos(9), rowPos(2));
+    display.print(F("[deg/s]"), colPos(9), rowPos(3)); 
+    
     for (i = 0; i < 3; i++)
     {
       display.print(labelsXYZ[i], colPos(9), rowPos(4 + i));
-      if (realGyro[i] < 0.0)
-        display.print(F("-"), colPos(11), rowPos(4 + i));
-      display.printNumF(abs(realGyro[i]), 2, colPos(12), rowPos(4 + i));
+	  displayNumberF(realGyro[i], 11, 4 + i, 7);
     }
   }
   else
   {
-    display.print(F("Angles"), colPos(9), rowPos(1));
-    display.print(F("[deg]"), colPos(9), rowPos(2));
+    display.print(F("Angles"), colPos(9), rowPos(2));
+    display.print(F("[deg]"), colPos(9), rowPos(3));
+    
     for (i = 0; i < 2; i++)
     {
       display.print(labelsYPR[i], colPos(9), rowPos(4 + i));
-      if (Awz[i] < 0.0)
-        display.print(F("-"), colPos(15), rowPos(4 + i));
-      display.printNumF(abs(Awz[i]), 2, colPos(16), rowPos(4 + i));
+	  displayNumberF(Awz[i], 11, 4 + i, 6);
     }
   }
+}
+
+void displayNumberF(float v, int col, int row, int length)
+{
+	if (v < 0)
+	{
+		display.print(F("-"), colPos(col), rowPos(row));
+	}
+	else
+	{
+		display.print(F("+"), colPos(col), rowPos(row));
+	}
+	display.printNumF(abs(v), 2, colPos(col + 1), rowPos(row), '.', length, '0');
 }
 
 // изчисляване на позицията на редовете на екрана
@@ -455,7 +464,7 @@ void calibrate()
   updateDisplay();
   
   display.print(F("Calibrating"), colPos(0), rowPos(0));
-  display.print(F("%"), colPos(0), rowPos(2));
+  display.print(F("%"), colPos(3), rowPos(2));
   if (getSensorID() == MPU6050_ID)
   {
     display.print(F("MPU6050"), colPos(0), rowPos(1));
@@ -472,7 +481,7 @@ void calibrate()
   {
     if (cal_int % 5 == 0)
     {
-      display.printNumI(++percent, 0, rowPos(2));
+      display.printNumI(++percent, 0, rowPos(2), 3);
       updateDisplay();
     }
     readSensorNoOffset();
@@ -484,6 +493,8 @@ void calibrate()
     accOffsetZ += (rawAcc[2] - getAccLSB());
     delay(3);                      // Забавяне от 3 микро секунди.
   }
+
+  display.update();
 
   // изчисляваме средната стойност от събраните данни
   gyroOffsetX /= 500;
@@ -505,6 +516,8 @@ void calibrate()
   Serial.print(F("\t"));
   Serial.print(accOffsetZ);
   Serial.println(F("\t"));
+  
+  delay(500);
 }
 
 void updateDisplay()
@@ -525,11 +538,11 @@ void refresh()
 
   if (getSensorID() == MPU6050_ID)
   {
-    display.print(F("MPU6050"), CENTER, rowPos(0));
+    display.print(F("MPU6050"), 0, rowPos(0));
   }
   else
   {
-    display.print(F("ADXL345"), CENTER, rowPos(0));
+    display.print(F("ADXL345"), 0, rowPos(0));
   }
   displayReadings();
 
@@ -580,7 +593,7 @@ void changeMode()
   }
   reset();
 
-  if (mode >= 2)
+  if (mode==0 || mode == 2)
   {
     calibrate();
   }
