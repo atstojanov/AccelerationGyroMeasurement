@@ -555,13 +555,21 @@ void changeSensor()
 
 void changeMode()
 {
-  Serial.println("Changing mode ...");
   if (mode == 3)
   {
     mode = 0;
   }
   else
+  {
     mode++;
+  }
+  reset();
+
+  if (mode >= 2)
+  {
+    calibrate();
+  }
+  reset();
 }
 
 void changeConnection()
