@@ -389,7 +389,7 @@ void reset()
 // показване на данните на екрана
 void displayReadings()
 {
-  static int i;
+  int i;
 
   display.print(F("Accel"), colPos(0), rowPos(1));
   display.print(F("[g]"), colPos(1), rowPos(2));
@@ -451,16 +451,31 @@ void displayButtons()
   // display.print("Rst", 97, 63 - 8);
 }
 
-void calibrateSensor()
+void calibrate()
 {
-  int percent = 0;
+  display.clrScr();
+  updateDisplay();
+  
+  display.print(F("Calibrating"), colPos(0), rowPos(0));
+  display.print(F("%"), colPos(0), rowPos(2));
+  if (getSensorID() == MPU6050_ID)
+  {
+    display.print(F("MPU6050"), colPos(0), rowPos(1));
+  }
+  else
+  {
+    display.print(F("ADXL345"), colPos(0), rowPos(1));
+  }
+
+  int percent = 0;  
+  
   // Взимаме 500 стойности
   for (int cal_int = 0; cal_int < 500; cal_int++)
   {
     if (cal_int % 5 == 0)
     {
-      display.printNumI(++percent, CENTER, rowPos(1));
-      display.update();
+      display.printNumI(++percent, 0, rowPos(2));
+      updateDisplay();
     }
     readSensorNoOffset();
     gyroOffsetX += rawGyro[0];
@@ -555,18 +570,6 @@ void readButtons()
   }
 }
 
-void calibrate()
-{
-  display.clrScr();
-  if (getSensorID() == MPU6050_ID)
-    display.print(F("Calibrating MPU6050"), CENTER, rowPos(0));
-  else
-    display.print(F("Calibrating ADXL345"), CENTER, rowPos(0));
-  display.update();
-
-  calibrateSensor();
-}
-
 void changeMode()
 {
   if (mode == 3)
@@ -588,12 +591,12 @@ void changeMode()
 
 void changeConnection()
 {
-  Serial.println(F("Changing connection ..."));
+  
 }
 
 void changeRange()
 {
-  Serial.println(F("Changing range ..."));
+  
 }
 
 void sendData()
