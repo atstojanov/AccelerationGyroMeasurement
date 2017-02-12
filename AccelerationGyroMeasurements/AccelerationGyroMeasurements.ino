@@ -498,6 +498,19 @@ void calibrateSensor()
   accOffsetX /= 500;
   accOffsetY /= 500;
   accOffsetZ /= 500;
+  
+  Serial.print(gyroOffsetX);
+  Serial.print(F("\t"));
+  Serial.print(gyroOffsetY);
+  Serial.print(F("\t"));
+  Serial.print(gyroOffsetZ);
+  Serial.print(F("\t"));
+  Serial.print(accOffsetX);
+  Serial.print(F("\t"));
+  Serial.print(accOffsetY);
+  Serial.print(F("\t"));
+  Serial.print(accOffsetZ);
+  Serial.println(F("\t"));
 }
 
 void updateDisplay()
