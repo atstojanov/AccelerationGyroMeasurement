@@ -154,7 +154,7 @@ void loop()
   getEstimatedInclination();
 
   // Опреснява се информацията на дисплея
-  updateDisplay();
+  refresh();
 
   // Изпращт се данни през серийния интерфейс към PC.
   sendData();
@@ -496,10 +496,17 @@ void calibrateSensor()
 
 void updateDisplay()
 {
+  if (updateDisplayNeeded)
+  {
+    updateDisplayNeeded = false;
+    display.update();
+  }
+}
+
+void refresh()
+{
   if (!updateDisplayNeeded)
     return;
-
-  updateDisplayNeeded = false;
 
   display.clrScr();
 
@@ -513,7 +520,7 @@ void updateDisplay()
   }
   displayReadings();
 
-  display.update();
+  updateDisplay();
 }
 
 // изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
