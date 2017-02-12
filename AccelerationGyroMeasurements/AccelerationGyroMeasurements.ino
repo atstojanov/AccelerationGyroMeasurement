@@ -95,7 +95,8 @@ bool firstSample = true; // Първо изчисление или не?
 int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
 
 byte mode = 0;
-bool connection;
+bool pcConnection;
+bool forceUpdate = false;
 
 void interrupt()
 {
@@ -133,9 +134,6 @@ void setup()
 	//Калибриране на сензорите.
 	calibrate();
 
-	//Конфигуриране на клавиатурата
-	keypad.setHoldTime(1000);
-
 	wGyro = 10;
 
 	//Съобщение в серийната конзола, че инициализацията е завършила
@@ -155,11 +153,17 @@ void loop()
 	// Изчислява се наклона на устройството.
 	getEstimatedInclination();
 
-	// Опреснява се информацията на дисплея
-	refresh();
-
-	// Изпращт се данни през серийния интерфейс към PC.
-	sendData();
+	if (pcConnection)
+	{
+		// Изпращт се данни през серийния интерфейс към PC.
+		sendData();
+	}
+	else
+	{
+		// Опреснява се информацията на дисплея
+		refresh();
+	}
+	
 
 	// Променя се състоянието на индикиращия LED. Той служи като индикация, че програмата не е спряла.
 	digitalWrite(LED_PIN, !digitalRead(LED_PIN));
@@ -368,10 +372,11 @@ void rawToReal()
 	}
 }
 
-// рестарт
+// ресет на стейта
 void reset()
 {
 	firstSample = true;
+	interval = 0;
 	for (int i = 0; i < 3; i++)
 	{
 		RwAcc[i] = 0;
@@ -381,6 +386,10 @@ void reset()
 		rawAcc[i] = 0;
 		rawGyro[i] = 0;
 	}
+}
+
+void setRanges()
+{
 	setFullScaleAccRange(accRange);
 	setFullScaleGyroRange(gyroRange);
 	setADXL345Range(accRange);
@@ -448,6 +457,20 @@ void displayAccRange(int col, int row)
 	display.print(accRanges[accRange], colPos(col + 1), rowPos(row));
 }
 
+void displaySensorName(int col, int row)
+{
+	if (getSensorID() == MPU6050_ID)
+	{
+		display.print(F("MPU6050"), colPos(col), rowPos(row));
+	}
+	else
+	{
+		display.print(F("ADXL345"), colPos(col), rowPos(row));
+	}
+
+}
+
+
 // изчисляване на позицията на редовете на екрана
 int rowPos(int row)
 {
@@ -478,16 +501,9 @@ void calibrate()
 
 	display.print(F("Calibrating"), colPos(0), rowPos(0));
 	display.print(F("%"), colPos(3), rowPos(2));
-	displayAccRange(11, 1);
-
-	if (getSensorID() == MPU6050_ID)
-	{
-		display.print(F("MPU6050 - "), colPos(0), rowPos(1));
-	}
-	else
-	{
-		display.print(F("ADXL345 - "), colPos(0), rowPos(1));
-	}
+	
+	displaySensorName(0, 1);
+	displayAccRange(9, 1);
 
 	int percent = 0;
 
@@ -537,9 +553,10 @@ void calibrate()
 
 void updateDisplay()
 {
-	if (updateDisplayNeeded)
+	if (updateDisplayNeeded || forceUpdate)
 	{
 		updateDisplayNeeded = false;
+		forceUpdate = false;
 		display.update();
 	}
 }
@@ -550,30 +567,21 @@ void refresh()
 		return;
 
 	display.clrScr();
-
-	if (getSensorID() == MPU6050_ID)
-	{
-		display.print(F("MPU6050"), 0, rowPos(0));
-	}
-	else
-	{
-		display.print(F("ADXL345"), 0, rowPos(0));
-	}
+	displaySensorName(0, 0);
 	displayReadings();
-
 	updateDisplay();
 }
 
 // изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
 double rawToRealAcc(int16_t value)
 {
-	return (double)value / (getAccLSB() / pow(2, accRange));
+	return (double)value / getAccLSB();
 }
 
 // изчисляване на показанията на жироскопа в deg/s. Обхвата се взема в предвид.
 double rawToRealGyro(int16_t value)
 {
-	return (double)value / (getGyroLSB() / (250 * pow(2, gyroRange)));
+	return (double)value / getGyroLSB();
 }
 
 void readButtons()
@@ -617,7 +625,8 @@ void changeMode()
 
 void changeConnection()
 {
-
+	pcConnection = !pcConnection;
+	forceUpdate = pcConnection;
 }
 
 void changeRange()
@@ -631,11 +640,34 @@ void changeRange()
 		accRange++;
 	}
 	reset();
+	setRanges();
 	calibrate();
 }
 
 void sendData()
 {
+	if (forceUpdate)
+	{
+		display.clrScr();
+
+		display.print(F("Sending data... "), colPos(0), rowPos(4));
+		updateDisplay();
+	}
+	
+	Serial.print(interval);  //microseconds since last sample, monitor this value to be < 10000, increase bitrate to print faster
+	Serial.print(F(","));
+	Serial.print(RwAcc[0]);  //Inclination X axis (as measured by accelerometer)
+	Serial.print(F(","));
+	Serial.print(RwEst[0]);  //Inclination X axis (estimated / filtered)
+	Serial.print(F(","));
+	Serial.print(RwAcc[1]);  //Inclination Y axis (as measured by accelerometer)
+	Serial.print(F(","));
+	Serial.print(RwEst[1]);  //Inclination Y axis (estimated / filtered)
+	Serial.print(F(","));
+	Serial.print(RwAcc[2]);  //Inclination Z axis (as measured by accelerometer)
+	Serial.print(F(","));
+	Serial.print(RwEst[2]);  //Inclination Z axis (estimated / filtered)  
+	Serial.println(F(""));
 }
 
 void readSensor()
@@ -662,15 +694,15 @@ void readSensorNoOffset()
 int16_t getAccLSB()
 {
 	if (getSensorID() == MPU6050_ID)
-		return MPU6050_ACC_LSB;
+		return MPU6050_ACC_LSB / pow(2, accRange);
 	else
-		return ADXL345_ACC_LSB;
+		return ADXL345_ACC_LSB / pow(2, accRange);
 }
 
 int16_t getGyroLSB()
 {
 	if (getSensorID() == MPU6050_ID)
-		return MPU6050_GYRO_LSB;
+		return MPU6050_GYRO_LSB / (250 * pow(2, gyroRange));
 	else
 		return 1; // ADXL 345 няма жироскоп, затова се връща 1.
 }
