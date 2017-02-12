@@ -405,7 +405,7 @@ void displayReadings()
   if (isRawMode())
   {
     display.print(F("Velocity"), colPos(9), rowPos(1));
-    display.print(F("[deg/s]"), colPos(19), rowPos(2)); 
+    display.print(F("[deg/s]"), colPos(10), rowPos(2)); 
     for (i = 0; i < 3; i++)
     {
       display.print(labelsXYZ[i], colPos(9), rowPos(4 + i));
