@@ -34,11 +34,14 @@
 #define ADXL345_RA_DATAY1 0x35
 #define ADXL345_RA_DATAZ0 0x36
 #define ADXL345_RA_DATAZ1 0x37
+#define ADXL345_ACC_LSB 256
 
 #define MPU6050_ID 0x00
 #define MPU6050_ADDRESS 0x68
 #define MPU6050_RA_GYRO_CONFIG 0x1B
 #define MPU6050_RA_ACCEL_CONFIG 0x1C
+#define MPU6050_ACC_LSB 16384
+#define MPU6050_GYRO_LSB 32768
 
 #define LED_PIN 13
 
@@ -93,21 +96,21 @@ bool firstSample = true; // Първо изчисление или не?
 
 int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
 
-char ADXL345Name[] = "ADXL345";
-char MPU6050Name[] = "MPU6050";
+// char ADXL345Name[] = "ADXL345";
+// char MPU6050Name[] = "MPU6050";
 //char *modes[] = {"Estimates", "Max estimates", "RAW", "Max RAW" };
 
 int mode = 0;
 // char keyPressed;
 // bool holdButtonProcessing = false;
 
-struct
-{
-  byte id; // 0 MPU6050; 1 ADXL345
-  char *name;
-  int gRange;
-  int aRange;
-} sensor;
+// struct
+// {
+//   byte id; // 0 MPU6050; 1 ADXL345
+//   char *name;
+//   int gRange;
+//   int aRange;
+// } sensor;
 
 void interrupt()
 {
@@ -149,8 +152,8 @@ void setup()
   MsTimer2::set(100, interrupt);
   MsTimer2::start();
 
-  // избор на активен сензор
-  setActiveSensor(MPU6050_ID);
+  // // избор на активен сензор
+  // setActiveSensor(MPU6050_ID);
 
   //Съобщение в серийната конзола, че инициализацията е завършила
   Serial.println("Done!");
@@ -488,24 +491,29 @@ void updateDisplay()
 
   display.clrScr();
 
-  //displayButtons();
-
+  if (getSensorID() == MPU6050_ID)
+  {
+    display.print("MPU6050", CENTER, rowPos(0));
+  }
+  else
+  {
+    display.print("ADXL345", CENTER, rowPos(0));
+  }
   displayReadings();
-  display.print(sensor.name, CENTER, rowPos(0));
-  //display.print(modes[mode], CENTER, rowPos(1));
+
   display.update();
 }
 
 // изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
 double rawToRealAcc(int16_t value)
 {
-  return (double)value / (sensor.aRange / pow(2, accRange));
+  return (double)value / (getAccLSB() / pow(2, accRange));
 }
 
 // изчисляване на показанията на жироскопа в deg/s. Обхвата се взема в предвид.
 double rawToRealGyro(int16_t value)
 {
-  return (double)value / (sensor.gRange / (250 * pow(2, gyroRange)));
+  return (double)value / (getGyroLSB() / (250 * pow(2, gyroRange)));
 }
 
 void readButtons()
@@ -531,7 +539,7 @@ void readButtons()
 void calibrate()
 {
   display.clrScr();
-  if(sensor.id == MPU6050_ID)
+  if (getSensorID() == MPU6050_ID)
     display.print("Calibrating MPU6050", CENTER, rowPos(0));
   else
     display.print("Calibrating ADXL345", CENTER, rowPos(0));
@@ -583,7 +591,7 @@ void readSensor()
 
 void readSensorNoOffset()
 {
-  if (sensor.id == MPU6050_ID)
+  if (getSensorID() == MPU6050_ID)
   {
     readMPU6050();
   }
@@ -591,20 +599,31 @@ void readSensorNoOffset()
     readADXL345();
 }
 
-void setActiveSensor(byte id)
+int16_t getAccLSB()
 {
-  if (id == MPU6050_ID)
-  {
-    sensor.id = id;
-    sensor.name = MPU6050Name;
-    sensor.gRange = 32768;
-    sensor.aRange = 16384;
-  }
-  else if (id == ADXL345_ID)
-  {
-    sensor.id = id;
-    sensor.name = ADXL345Name;
-    sensor.gRange = 512; //не може да бъде нула
-    sensor.aRange = 256;
-  }
+  if (getSensorID() == MPU6050_ID)
+    return MPU6050_ACC_LSB;
+  else
+    return ADXL345_ACC_LSB;
+}
+
+int16_t getGyroLSB()
+{
+  if (getSensorID() == MPU6050_ID)
+    return MPU6050_GYRO_LSB;
+  else
+    return 1; // ADXL 345 няма жироскоп, затова се връща 1.
+}
+
+byte getSensorID()
+{
+  if (mode <= 1)
+    return MPU6050_ID;
+  if (mode > 1)
+    return ADXL345_ID;
+}
+
+bool isRawMode()
+{
+  return mode == 1 || mode == 3;
 }
