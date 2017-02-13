@@ -171,8 +171,7 @@ void loop()
 		refresh();
 	}
 
-
-	// Променя се състоянието на индикиращия LED. Той служи като индикация, че програмата не е спряла.
+	// Променя се състоянието на LED индикацията. Той служи като индикация, че програмата не е спряла.
 	digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
@@ -566,12 +565,15 @@ void readButtons()
 		break;
 	case BUTTON_2:
 		changeRange();
+		forceUpdate = true;
 		break;
 	case BUTTON_3:
 		changeConnection();
+		forceUpdate = true;
 		break;
 	case BUTTON_4:
 		changeMode();
+		forceUpdate = true;
 		break;
 	}
 }
