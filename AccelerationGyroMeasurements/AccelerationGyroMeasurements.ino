@@ -2,6 +2,7 @@
 #include "Keypad.h"
 #include "OLED_I2C.h"
 #include <MsTimer2.h>
+#include "avr/pgmspace.h"
 
 #define BUTTON_1 '1'
 #define BUTTON_2 '2'
@@ -163,7 +164,7 @@ void loop()
 		// Опреснява се информацията на дисплея
 		refresh();
 	}
-	
+
 
 	// Променя се състоянието на индикиращия LED. Той служи като индикация, че програмата не е спряла.
 	digitalWrite(LED_PIN, !digitalRead(LED_PIN));
@@ -395,125 +396,32 @@ void setRanges()
 	setADXL345Range(accRange);
 }
 
-// показване на данните на екрана
-void displayReadings()
+void updateCalibrationInfo(int percent)
 {
-	int i;
+	updateDisplayNeeded = updateDisplayNeeded || percent==100;
 
-	display.print(F("Accel"), colPos(0), rowPos(2));
-	displayAccRange(0, 3);
-
-	for (i = 0; i < 3; i++)
+	if (updateDisplayNeeded) 
 	{
-		display.print(labelsXYZ[i], colPos(0), rowPos(4 + i));
-		displayNumberF(realAcc[i], 2, 4 + i, 5);
+		display.clrScr();
+		displayText(F("Calibrating"), 0, 0);
+		displayText(F("%"), 3, 2);
+		displaySensorName(0, 1);
+		displayAccRange(9, 1);
+		display.printNumI(++percent, 0, rowPos(2), 3);
+		updateDisplay();
 	}
-
-	if (isRawMode())
-	{
-		display.print(F("Velocity"), colPos(9), rowPos(2));
-		display.print(F("[deg/s]"), colPos(9), rowPos(3));
-
-		for (i = 0; i < 3; i++)
-		{
-			display.print(labelsXYZ[i], colPos(9), rowPos(4 + i));
-			displayNumberF(realGyro[i], 11, 4 + i, 7);
-		}
-	}
-	else
-	{
-		display.print(F("Angles"), colPos(9), rowPos(2));
-		display.print(F("[deg]"), colPos(9), rowPos(3));
-
-		for (i = 0; i < 2; i++)
-		{
-			display.print(labelsYPR[i], colPos(9), rowPos(4 + i));
-			displayNumberF(Awz[i], 11, 4 + i, 6);
-		}
-	}
-}
-
-void displayNumberF(float v, int col, int row, int length)
-{
-	if (v < 0)
-	{
-		display.print(F("-"), colPos(col), rowPos(row));
-	}
-	else
-	{
-		display.print(F("+"), colPos(col), rowPos(row));
-	}
-	display.printNumF(abs(v), 2, colPos(col + 1), rowPos(row), '.', length, '0');
-}
-
-void displayPlusMinus(int col, int row)
-{
-	display.drawBitmap(colPos(col), rowPos(row), plusminus, 6, 8);
-}
-
-void displayAccRange(int col, int row)
-{
-	displayPlusMinus(col, row);
-	display.print(accRanges[accRange], colPos(col + 1), rowPos(row));
-}
-
-void displaySensorName(int col, int row)
-{
-	if (getSensorID() == MPU6050_ID)
-	{
-		display.print(F("MPU6050"), colPos(col), rowPos(row));
-	}
-	else
-	{
-		display.print(F("ADXL345"), colPos(col), rowPos(row));
-	}
-
-}
-
-
-// изчисляване на позицията на редовете на екрана
-int rowPos(int row)
-{
-	return row * FONT_HEIGHT;
-}
-
-// изчисляване на позицията на колоните на екрана
-int colPos(int col)
-{
-	return col * FONT_WIDTH;
-}
-
-// показване на най-долния ред с текст над бутоните.
-void displayButtons()
-{
-	// display.drawRect(0, 63 - 10, 127, 63);
-	// display.drawLine(31, 63 - 10, 31, 63);
-	// display.drawLine(63, 63 - 10, 63, 63);
-	// display.drawLine(95, 63 - 10, 95, 63);
-	// display.print("Mode", 2, 63 - 8);
-	// display.print("Rst", 97, 63 - 8);
 }
 
 void calibrate()
 {
-	display.clrScr();
-	updateDisplay();
-
-	display.print(F("Calibrating"), colPos(0), rowPos(0));
-	display.print(F("%"), colPos(3), rowPos(2));
-	
-	displaySensorName(0, 1);
-	displayAccRange(9, 1);
-
-	int percent = 0;
+	//int percent = 0;
 
 	// Взимаме 500 стойности
 	for (int cal_int = 0; cal_int < 500; cal_int++)
 	{
 		if (cal_int % 5 == 0)
 		{
-			display.printNumI(++percent, 0, rowPos(2), 3);
-			updateDisplay();
+			updateCalibrationInfo((cal_int / 5));
 		}
 		readSensorNoOffset();
 		gyroOffsetX += rawGyro[0];
@@ -549,6 +457,108 @@ void calibrate()
 	Serial.println(F("\t"));
 
 	delay(500);
+}
+
+// показване на данните на екрана
+void displayReadings()
+{
+	int i;
+
+	displayText(F("Accel"), 0, 2);
+	displayAccRange(0, 3);
+
+	for (i = 0; i < 3; i++)
+	{
+		displayText(labelsXYZ[i], 0, 4 + i);
+		displayNumberF(realAcc[i], 2, 4 + i, 5);
+	}
+
+	if (isRawMode())
+	{
+		displayText(F("Velocity"), 9, 2);
+		displayText(F("[deg/s]"), 9, 3);
+
+		for (i = 0; i < 3; i++)
+		{
+			displayText(labelsXYZ[i], 9, 4 + i);
+			displayNumberF(realGyro[i], 11, 4 + i, 7);
+		}
+	}
+	else
+	{
+		displayText(F("Angles"), 9, 2);
+		displayText(F("[deg]"), 9, 3);
+		for (i = 0; i < 2; i++)
+		{
+			display.print(labelsYPR[i], colPos(9), rowPos(4 + i));
+			displayNumberF(Awz[i], 11, 4 + i, 6);
+		}
+	}
+}
+
+void displayNumberF(float v, int col, int row, int length)
+{
+	if (v < 0)
+	{
+		display.print(F("-"), colPos(col), rowPos(row));
+	}
+	else
+	{
+		display.print(F("+"), colPos(col), rowPos(row));
+	}
+	display.printNumF(abs(v), 2, colPos(col + 1), rowPos(row), '.', length, '0');
+}
+
+void displayPlusMinus(int col, int row)
+{
+	display.drawBitmap(colPos(col), rowPos(row), plusminus, 6, 8);
+}
+
+void displayAccRange(int col, int row)
+{
+	displayPlusMinus(col, row);
+	displayText(accRanges[accRange], col + 1, row);
+}
+
+void displaySensorName(int col, int row)
+{
+	if (getSensorID() == MPU6050_ID)
+	{
+		displayText(F("MPU6050"), col, row);
+	}
+	else
+	{
+		displayText(F("ADXL345"), col, row);
+	}
+}
+
+void displayText(const __FlashStringHelper *st, int col, int row)
+{
+	char buffer[strlen_P((PGM_P)st) +1 ];
+	
+	strcpy_P(buffer, (PGM_P)st);
+	displayText(buffer, col, row);
+}
+
+void displayText(char *st, int col, int row)
+{
+	display.print(st, colPos(col), rowPos(row));
+}
+
+void displayText(String st, int col, int row)
+{
+	display.print(st, colPos(col), rowPos(row));
+}
+
+// показване на най-долния ред с текст над бутоните.
+void displayButtons()
+{
+	// display.drawRect(0, 63 - 10, 127, 63);
+	// display.drawLine(31, 63 - 10, 31, 63);
+	// display.drawLine(63, 63 - 10, 63, 63);
+	// display.drawLine(95, 63 - 10, 95, 63);
+	// display.print("Mode", 2, 63 - 8);
+	// display.print("Rst", 97, 63 - 8);
 }
 
 void updateDisplay()
@@ -591,6 +601,7 @@ void readButtons()
 	{
 	case BUTTON_1:
 		calibrate();
+		forceUpdate = true;
 		break;
 	case BUTTON_2:
 		changeRange();
@@ -649,11 +660,12 @@ void sendData()
 	if (forceUpdate)
 	{
 		display.clrScr();
-
-		display.print(F("Sending data... "), colPos(0), rowPos(4));
+		displaySensorName(0, 0);
+		displayAccRange(0, 1);
+		displayText(F("Sending data... "), 0, 4);
 		updateDisplay();
 	}
-	
+
 	Serial.print(interval);  //microseconds since last sample, monitor this value to be < 10000, increase bitrate to print faster
 	Serial.print(F(","));
 	Serial.print(RwAcc[0]);  //Inclination X axis (as measured by accelerometer)
