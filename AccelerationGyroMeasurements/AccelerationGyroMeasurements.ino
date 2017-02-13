@@ -95,8 +95,16 @@ bool firstSample = true; // Първо изчисление или не?
 
 int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
 
+// режим на работа
+// 0 - четат се данни от MPU6050, визуализира се ускорение и наклон на устройството.
+// 1 - четат се данни от MPU6050, визуализира се ускорение и скорост на завъртане.
+// 2 - четат се данни от ADXL345, визуализира се ускорение и наклон на устройството.
 byte mode = 0;
+
+// Оказва дали е включена връзката към PC или не.
 bool pcConnection;
+
+// Когато този флаг е вдигнат, на следващата итерация задължително ще бъдат опреснени данните на дисплея.
 bool forceUpdate = false;
 
 void interrupt()
@@ -311,6 +319,7 @@ void readMPU6050()
 	};
 	// Измерените стойности от сензора са 16 битови. Четенето по I2C е на части от по 8 бита.
 	// за това се налага събирането на два последователни байта в една стойностт.
+	// байтовете са по двойки: High-Low
 	rawAcc[0] = Wire.read() << 8 | Wire.read();
 	rawAcc[1] = Wire.read() << 8 | Wire.read();
 	rawAcc[2] = Wire.read() << 8 | Wire.read();
@@ -355,6 +364,7 @@ void readADXL345()
 	};
 	// Измерените стойности от сензора са 12 битови. Четенето по I2C е на части от по 8 бита.
 	// за това се налага събирането на два последователни байта в една стойностт.
+	// байтовете са по двойки: Low High
 	rawAcc[0] = Wire.read() | Wire.read() << 8;
 	rawAcc[1] = Wire.read() | Wire.read() << 8;
 	rawAcc[2] = Wire.read() | Wire.read() << 8;
@@ -366,6 +376,9 @@ void readADXL345()
 
 void rawToReal()
 {
+	// конвертиране на данните:
+	// Accelerometer: bytes -> g
+	// Gyroscope: bytes -> deg/s
 	for (int i = 0; i < 3; i++)
 	{
 		realGyro[i] = rawToRealGyro(rawGyro[i]);
@@ -373,7 +386,8 @@ void rawToReal()
 	}
 }
 
-// ресет на стейта
+// ресет на състоянието на вътрешните променливи
+// използва се при смяна режима на работа, обхвата или след калибрация.
 void reset()
 {
 	firstSample = true;
@@ -398,9 +412,9 @@ void setRanges()
 
 void updateCalibrationInfo(int percent)
 {
-	updateDisplayNeeded = updateDisplayNeeded || percent==100;
+	updateDisplayNeeded = updateDisplayNeeded || percent == 100;
 
-	if (updateDisplayNeeded) 
+	if (updateDisplayNeeded)
 	{
 		display.clrScr();
 		displayText(F("Calibrating"), 0, 0);
@@ -414,9 +428,7 @@ void updateCalibrationInfo(int percent)
 
 void calibrate()
 {
-	//int percent = 0;
-
-	// Взимаме 500 стойности
+	// Взимат се 500 стойности
 	for (int cal_int = 0; cal_int < 500; cal_int++)
 	{
 		if (cal_int % 5 == 0)
@@ -435,7 +447,7 @@ void calibrate()
 
 	display.update();
 
-	// изчисляваме средната стойност от събраните данни
+	// изчислява се средната стойност от събраните данни
 	gyroOffsetX /= 500;
 	gyroOffsetY /= 500;
 	gyroOffsetZ /= 500;
@@ -443,6 +455,7 @@ void calibrate()
 	accOffsetY /= 500;
 	accOffsetZ /= 500;
 
+	// изпращат се данните от калибрацията към PC
 	Serial.print(gyroOffsetX);
 	Serial.print(F("\t"));
 	Serial.print(gyroOffsetY);
@@ -464,6 +477,7 @@ void displayReadings()
 {
 	int i;
 
+	// Данните от акселерометъра се показват винаги
 	displayText(F("Accel"), 0, 2);
 	displayAccRange(0, 3);
 
@@ -473,8 +487,12 @@ void displayReadings()
 		displayNumberF(realAcc[i], 2, 4 + i, 5);
 	}
 
+	// Данните от жироскопа могат да бъдат в два вариянта
+	// 1. Наклон - в градуси
+	// 2. Скорост на въртене - градус/секунда
 	if (isRawMode())
 	{
+		// скорост на въртене
 		displayText(F("Velocity"), 9, 2);
 		displayText(F("[deg/s]"), 9, 3);
 
@@ -486,6 +504,7 @@ void displayReadings()
 	}
 	else
 	{
+		// Наклон
 		displayText(F("Angles"), 9, 2);
 		displayText(F("[deg]"), 9, 3);
 		for (i = 0; i < 2; i++)
@@ -496,71 +515,7 @@ void displayReadings()
 	}
 }
 
-void displayNumberF(float v, int col, int row, int length)
-{
-	if (v < 0)
-	{
-		display.print(F("-"), colPos(col), rowPos(row));
-	}
-	else
-	{
-		display.print(F("+"), colPos(col), rowPos(row));
-	}
-	display.printNumF(abs(v), 2, colPos(col + 1), rowPos(row), '.', length, '0');
-}
-
-void displayPlusMinus(int col, int row)
-{
-	display.drawBitmap(colPos(col), rowPos(row), plusminus, 6, 8);
-}
-
-void displayAccRange(int col, int row)
-{
-	displayPlusMinus(col, row);
-	displayText(accRanges[accRange], col + 1, row);
-}
-
-void displaySensorName(int col, int row)
-{
-	if (getSensorID() == MPU6050_ID)
-	{
-		displayText(F("MPU6050"), col, row);
-	}
-	else
-	{
-		displayText(F("ADXL345"), col, row);
-	}
-}
-
-void displayText(const __FlashStringHelper *st, int col, int row)
-{
-	char buffer[strlen_P((PGM_P)st) +1 ];
-	
-	strcpy_P(buffer, (PGM_P)st);
-	displayText(buffer, col, row);
-}
-
-void displayText(char *st, int col, int row)
-{
-	display.print(st, colPos(col), rowPos(row));
-}
-
-void displayText(String st, int col, int row)
-{
-	display.print(st, colPos(col), rowPos(row));
-}
-
-// показване на най-долния ред с текст над бутоните.
-void displayButtons()
-{
-	// display.drawRect(0, 63 - 10, 127, 63);
-	// display.drawLine(31, 63 - 10, 31, 63);
-	// display.drawLine(63, 63 - 10, 63, 63);
-	// display.drawLine(95, 63 - 10, 95, 63);
-	// display.print("Mode", 2, 63 - 8);
-	// display.print("Rst", 97, 63 - 8);
-}
-
+// Изпращане на информацията от дисплейния буфер към дисплея
 void updateDisplay()
 {
 	if (updateDisplayNeeded || forceUpdate)
@@ -571,6 +526,7 @@ void updateDisplay()
 	}
 }
 
+// Опресняване инфромацията в буфера на дисплея
 void refresh()
 {
 	if (!updateDisplayNeeded)
@@ -582,17 +538,24 @@ void refresh()
 	updateDisplay();
 }
 
-// изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
+// Изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
 double rawToRealAcc(int16_t value)
 {
 	return (double)value / getAccLSB();
 }
 
-// изчисляване на показанията на жироскопа в deg/s. Обхвата се взема в предвид.
+// Изчисляване на показанията на жироскопа в deg/s. Обхвата се взема в предвид.
 double rawToRealGyro(int16_t value)
 {
 	return (double)value / getGyroLSB();
 }
+
+// Четене на бутоните на клавиатурата
+// Ако някой от тях е натиснат - изпълнява се съответната функция
+// "1" - Калибриране на сензора
+// "2" - Смяна на обхвата на сензора
+// "3" - Преминаване на връзка към PC или обратно
+// "4" - Смяна на режима на работа
 
 void readButtons()
 {
@@ -614,7 +577,7 @@ void readButtons()
 		break;
 	}
 }
-
+// Смяна на режима на работа
 void changeMode()
 {
 	if (mode == 2)
@@ -634,11 +597,14 @@ void changeMode()
 	reset();
 }
 
+// Смяна на връзката 
 void changeConnection()
 {
 	pcConnection = !pcConnection;
 	forceUpdate = pcConnection;
 }
+
+// Смяна на обхвата на акселерометъра
 
 void changeRange()
 {
