@@ -36,6 +36,21 @@
 #define MPU6050_ADDRESS 0x68
 #define MPU6050_RA_GYRO_CONFIG 0x1B
 #define MPU6050_RA_ACCEL_CONFIG 0x1C
+#define MPU6050_RA_ACCEL_XOUT_H     0x3B
+#define MPU6050_RA_ACCEL_XOUT_L     0x3C
+#define MPU6050_RA_ACCEL_YOUT_H     0x3D
+#define MPU6050_RA_ACCEL_YOUT_L     0x3E
+#define MPU6050_RA_ACCEL_ZOUT_H     0x3F
+#define MPU6050_RA_ACCEL_ZOUT_L     0x40
+#define MPU6050_RA_TEMP_OUT_H       0x41
+#define MPU6050_RA_TEMP_OUT_L       0x42
+#define MPU6050_RA_GYRO_XOUT_H      0x43
+#define MPU6050_RA_GYRO_XOUT_L      0x44
+#define MPU6050_RA_GYRO_YOUT_H      0x45
+#define MPU6050_RA_GYRO_YOUT_L      0x46
+#define MPU6050_RA_GYRO_ZOUT_H      0x47
+#define MPU6050_RA_GYRO_ZOUT_L      0x48
+#define MPU6050_RA_PWR_MGMT_1 0x6B
 #define MPU6050_ACC_LSB 16384
 #define MPU6050_GYRO_LSB 32768
 
@@ -52,14 +67,15 @@ const byte ROWS = 2;
 // Брой колони на клавиатурата
 const byte COLS = 2;
 
-// Описание на стойностите, на които отговарят бутоните на клавиатурата
+// Описание на стойностите, 
+// на които отговарят бутоните на клавиатурата
 char keys[ROWS][COLS] = {
 	{'4', '3'},
 	{'2', '1'} };
 
-//пинове към които са свързани редовете на клавиатурата
+// Пинове към които са свързани редовете на клавиатурата.
 byte rowPins[ROWS] = { 4, 5 };
-//пинове към които са свързани колоните на клавиатурата
+// Пинове към които са свързани колоните на клавиатурата
 byte colPins[COLS] = { 6, 7 };
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
@@ -67,46 +83,61 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 OLED display(SDA, SCL, 10);
 extern uint8_t SmallFont[];
 
-long rawAcc[3];    // данни от акселерометъра в чист вид.
-long rawGyro[3];   // данни от жироскопа в чист вид.
-float realAcc[3];  // показания на акселерометъра в g.
-float realGyro[3]; // показания на жироскопа в deg/s.
+// данни от акселерометъра в чист вид.
+long rawAcc[3];
+// данни от жироскопа в чист вид.
+long rawGyro[3];
+// показания на акселерометъра в g.
+float realAcc[3];
+// показания на жироскопа в deg/s.
+float realGyro[3]; 
 
-unsigned long interval; // интервал от време изминал от последното изчисление
-float RwAcc[3];         // проекция нормализирания вектор на гравитацията върху x/y/z осите, измерен от акселерометъра.
-float RwGyro[3];        // Rw получен при последните изчисления
-float Awz[2];           // ъглите между проекцията на R върху  XZ/YZ равнините и оста Z (deg).
+// интервал от време изминал от последното изчисление
+unsigned long interval;
+// проекция вектора на гравитацията върху x/y/z осите.
+float RwAcc[3];
+// Rw получен при последните изчисления
+float RwGyro[3];
+// ъглите между проекцията на R върху XZ/YZ равнините и оста Z (deg).
+float Awz[2];
+//Rw изчислен от комбинирането на RwAcc и RwGyro
+float RwEst[3]; 
 
-float RwEst[3]; //Rw изчислен от комбинирането на RwAcc и RwGyro
+// Първо изчисление или не?
+bool firstSample = true;
 
 unsigned long lastMicros;
-int temperature; //  използва се само при вземане на данните от MPU 6050.
 
-const float wGyro = 10; // коефициент показващ каква тежест имат резултатите от жироскопа
+// Температурата измерена от температурния сензор на MPU6050.
+int temperature; 
 
-// отмествания от реалната стойност за акселерометъра
+// Тежест на резултатите от жироскопа.
+const float wGyro = 10; 
+
+// Отмествания от реалната стойност за акселерометъра.
 long accOffsetX, accOffsetY, accOffsetZ;
-// отмествания от реалната стойности за жироскопа
+// Отмествания от реалната стойности за жироскопа.
 long gyroOffsetX, gyroOffsetY, gyroOffsetZ;
 
-volatile bool updateDisplayNeeded = false; // показва дали данните на дисплея трябва да се опреснят.
+// Показва дали данните на дисплея трябва да се опреснят.
+volatile bool updateDisplayNeeded = false; 
 
-bool firstSample = true; // Първо изчисление или не?
-
-int accRange = 0, gyroRange = 3; // текущ обхват на акселерометъра и жироскопа
+// Текущ обхват на акселерометъра и жироскопа.
+int accRange = 0, gyroRange = 3; 
 
 // режим на работа
-// 0 - четат се данни от MPU6050, визуализира се ускорение и наклон на устройството.
-// 1 - четат се данни от MPU6050, визуализира се ускорение и скорост на завъртане.
-// 2 - четат се данни от ADXL345, визуализира се ускорение и наклон на устройството.
+// 0 - MPU6050, визуализира се ускорение и наклон на устройството.
+// 1 - MPU6050, визуализира се ускорение и скорост на завъртане.
+// 2 - ADXL345, визуализира се ускорение и наклон на устройството.
 byte mode = 0;
 
 // Оказва дали е включена връзката към PC или не.
 bool pcConnection;
 
-// Когато този флаг е вдигнат, на следващата итерация задължително ще бъдат опреснени данните на дисплея.
+// Принудително опресняване на дисплея.
 bool forceUpdate = false;
 
+// Извиква се, когато таймера достигне зададеното време.
 void interrupt()
 {
 	updateDisplayNeeded = true;
@@ -171,7 +202,8 @@ void loop()
 		refresh();
 	}
 
-	// Променя се състоянието на LED индикацията. Той служи като индикация, че програмата не е спряла.
+	// Променя се състоянието на LED индикацията.
+	// Тя служи като индикация, че програмата не е спряла.
 	digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
@@ -187,7 +219,9 @@ void getEstimatedInclination()
 
 	// Изчисляване на интервала от време от предишното измерване
 	interval = newMicros - lastMicros;
-	// Запазване за следващото измерване. При първото измерване тази стойност ще е невалидна, но в този случай тя не влиза в изчисленията.
+	// Запазване за следващото измерване. 
+	// При първото измерване тази стойност ще е невалидна,
+	// но в този случай тя не влиза в изчисленията.
 	lastMicros = newMicros;
 
 	// Получаване на данните за акселерометъра в g.
@@ -197,7 +231,9 @@ void getEstimatedInclination()
 		RwAcc[w] = realAcc[w];
 	}
 
-	// нормализиране на вектора (новият вектор има същата посока и дължина 1)
+	// нормализиране на вектора (новият вектор има същата посока и 
+	// дължина 1)
+
 	normalize3DVector(RwAcc);
 
 	if (firstSample)
@@ -211,32 +247,46 @@ void getEstimatedInclination()
 		// Изчисляване на RwGyro вектора
 		if (abs(RwEst[2]) < 0.1)
 		{
-			// Стойността на Rz е твърде малка, тъй като тази стойност се взема за референция за изчисляването на Axz, Ayz,  флуктоациите на нейната грешка, ще бъдат усилени,
-			// което ще доведе до грешни резлутати. В този случай можем да я пренебрегнем и за тази цел ще използваме стойностите от предишното изчисление.
+			// Стойността на Rz е твърде малка, тъй като тази 
+			// стойност се взема за референция за изчисляването 
+			// на Axz, Ayz,  флуктоациите на нейната грешка, ще бъдат
+			// усилени, което ще доведе до грешни резлутати. 
+			// В този случай можем да я пренебрегнем и за тази цел 
+			// ще използваме стойностите от предишното изчисление.
 			for (w = 0; w <= 2; w++)
 				RwGyro[w] = RwEst[w];
 		}
 		else
 		{
-			// изчисляване на ъглите между проекцията на R върху ZX/ZY и оста Z, базирани на последните изчисления RwEst
+			// изчисляване на ъглите между проекцията на R  
+			// върху ZX/ZY и оста Z
 			for (w = 0; w <= 1; w++)
 			{
-				tmpf = realGyro[w] / 1000.0;                     // текуща стойност на жироскопа в deg/ms
-				tmpf *= interval / 1000.0f;                      // промяна на ъгъла в градуси
-				Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG; // изчисляване на ъглите в градуси
-				Awz[w] += tmpf;                                  // нова стойност за ъгъла, спрямо жироскопа
+				// текуща стойност на жироскопа в deg/ms
+				tmpf = realGyro[w] / 1000.0;                     
+				// интервал от последното измерване в ms.
+				tmpf *= interval / 1000.0f;                      
+				// изчисляване на ъглите в градуси
+				Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG; 
+				// нова стойност за ъгъла, спрямо жироскопа
+				Awz[w] += tmpf;                                  
 			}
-			// Определяне знака на RzGyro, като проверяваме в кой квадрант лежи ъгъла Axz.
-			// RzGyro е положителен ако Axz е в границите -90 до 90 градуса => cos(Awz) >= 0
+			// Определяне знака на RzGyro, като проверяваме в кой 
+			// квадрант лежи ъгъла Axz.
+			// RzGyro е положителен ако Axz е в границите 
+			// -90 до 90 градуса => cos(Awz) >= 0
 			signRzGyro = (cos(Awz[0] * DEG_TO_RAD) >= 0) ? 1 : -1;
 
 			//Обратно пресмятане на RwGyro от ъглите Awz.
 			for (w = 0; w <= 1; w++)
 			{
 				RwGyro[w] = sin(Awz[w] * DEG_TO_RAD);
-				RwGyro[w] /= sqrt(1 + squared(cos(Awz[w] * DEG_TO_RAD)) * squared(tan(Awz[1 - w] * DEG_TO_RAD)));
+				RwGyro[w] /= sqrt(1 + 
+					squared(cos(Awz[w] * DEG_TO_RAD)) *
+					squared(tan(Awz[1 - w] * DEG_TO_RAD)));
 			}
-			RwGyro[2] = signRzGyro * sqrt(1 - squared(RwGyro[0]) - squared(RwGyro[1]));
+			RwGyro[2] = signRzGyro * sqrt(1 - squared(RwGyro[0]) -
+				squared(RwGyro[1]));
 		}
 
 		// комбиниране на данните от Акселерометъра и жироскопа
@@ -246,7 +296,7 @@ void getEstimatedInclination()
 		normalize3DVector(RwEst);
 	}
 
-	// Преизчисляване на ъглите след променените стойности, за визуализация.
+	// Преизчисляване на ъглите след променените стойности.
 	for (w = 0; w <= 1; w++)
 	{
 		Awz[w] = atan2(RwEst[w], RwEst[2]) * RAD_TO_DEG;
@@ -271,52 +321,61 @@ float squared(float x)
 	return x * x;
 }
 
+
 void setupMPU6050()
 {
-	// изкарване на от режим Sleep MPU-6050
-	Wire.beginTransmission(MPU6050_ADDRESS);
-	Wire.write(0x6B);
-	Wire.write(0x01);
+	// Привеждане на MPU6050 в работен режим.
+	// Начало на комуникация по I2C. Изпраща се адреса
+	// на устройството с което ще се комуникира.
+	Wire.beginTransmission(MPU6050_ADDRESS); 
+	// Изпраща се адреса на регистара в който ще се 
+	// записват/четат данни
+	Wire.write(MPU6050_RA_PWR_MGMT_1); 
+	// Изпращат се данните
+	Wire.write(0x01); 
+	// Прекратява се комуникацията
 	Wire.endTransmission();
-	// задаване на най-нисък обхват на работа
+	
+	// задаване на обхват на работа
 	setFullScaleAccRange(accRange);
-	setFullScaleGyroRange(gyroRange); //2000 deg/s
+	setFullScaleGyroRange(gyroRange);
 }
 
+// задаване на обхват на акселерометъра на MPU6050
 void setFullScaleAccRange(uint8_t range)
 {
-	// задаване на обхват на акселерометъра
 	Wire.beginTransmission(MPU6050_ADDRESS);
 	Wire.write(MPU6050_RA_ACCEL_CONFIG);
-	// битове 3 и 4 определят обхвата
-	Wire.write(range << 3);
+	Wire.write(range << 3); // битове 3 и 4 определят обхвата
 	Wire.endTransmission();
 }
 
 void setFullScaleGyroRange(uint8_t range)
 {
-	// задаване на обхват на жироскопа
 	Wire.beginTransmission(MPU6050_ADDRESS);
 	Wire.write(MPU6050_RA_GYRO_CONFIG);
-	// битове 3 и 4 определят обхвата
-	Wire.write(range << 3);
+	Wire.write(range << 3); // битове 3 и 4 определят обхвата
 	Wire.endTransmission();
 }
 
 // четене на данните от MPU6050
 void readMPU6050()
 {
-	// Начало на комуникацията с MPU-6050 по I2C.
 	Wire.beginTransmission(MPU6050_ADDRESS);
-	Wire.write(0x3B);                      // Изпращане на адреса на регистъра от който ще се чете
-	Wire.endTransmission();                // Край на предааването
-	Wire.requestFrom(MPU6050_ADDRESS, 14); // Заявка за 14 байта от MPU-6050
-	while (Wire.available() < 14)          // Изчакване докато бойтовете са получени
+	Wire.write(MPU6050_RA_ACCEL_XOUT_H);
+	Wire.endTransmission();                
+	// Заявка за прочитане на 14 байта
+	Wire.requestFrom(MPU6050_ADDRESS, 14); 
+	// Изчакване докато бойтовете са получени
+	while (Wire.available() < 14)          
 	{
 	};
-	// Измерените стойности от сензора са 16 битови. Четенето по I2C е на части от по 8 бита.
-	// за това се налага събирането на два последователни байта в една стойностт.
-	// байтовете са по двойки: High-Low
+	// Измерените стойности от сензора са 16 битови.
+	// Четенето по I2C е на части от по 8 бита.
+	// за това се налага събирането на два последователни 
+	// байта в една стойност.
+	// байтовете са по двойки, като първия байт е MSB,
+	// а втория LSB.
 	rawAcc[0] = Wire.read() << 8 | Wire.read();
 	rawAcc[1] = Wire.read() << 8 | Wire.read();
 	rawAcc[2] = Wire.read() << 8 | Wire.read();
@@ -328,19 +387,21 @@ void readMPU6050()
 
 void setupADXL345()
 {
-
+	// Привеждане на ADXL345 в неработен режим.
 	Wire.beginTransmission(ADXL345_ADDRESS);
 	Wire.write(ADXL345_RA_POWER_CTL);
 	Wire.write(0x00);
 	Wire.endTransmission();
-	// включване на акселерометъра в режим на измерване
+	// Привеждане на ADXL345 в работен режим.
 	Wire.beginTransmission(ADXL345_ADDRESS);
 	Wire.write(ADXL345_RA_POWER_CTL);
-	Wire.write(0x18);
+	Wire.write(0x08);
 	Wire.endTransmission();
+
 	setADXL345Range(accRange);
 }
 
+// Установяване на работния обхват на ADXL345
 void setADXL345Range(uint8_t range)
 {
 	Wire.beginTransmission(ADXL345_ADDRESS);
@@ -353,15 +414,19 @@ void readADXL345()
 {
 	// Начало на комуникацията с MPU-6050 по I2C.
 	Wire.beginTransmission(ADXL345_ADDRESS);
-	Wire.write(ADXL345_RA_DATAX0);        // Изпращане на адреса на регистъра от който ще се чете
-	Wire.endTransmission();               // Край на предааването
-	Wire.requestFrom(ADXL345_ADDRESS, 6); // Заявка за 6 байта от ADXL345
-	while (Wire.available() < 6)          // Изчакване докато бойтовете са получени
+	Wire.write(ADXL345_RA_DATAX0);        
+	Wire.endTransmission();
+	// Заявка за 6 байта от ADXL345
+	Wire.requestFrom(ADXL345_ADDRESS, 6); 
+	while (Wire.available() < 6)
 	{
 	};
-	// Измерените стойности от сензора са 12 битови. Четенето по I2C е на части от по 8 бита.
-	// за това се налага събирането на два последователни байта в една стойностт.
-	// байтовете са по двойки: Low High
+	// Измерените стойности от сензора са 16 битови.
+	// Четенето по I2C е на части от по 8 бита.
+	// за това се налага събирането на два последователни 
+	// байта в една стойност.
+	// байтовете са по двойки, като първия байт е LSB,
+	// а втория MSB.
 	rawAcc[0] = Wire.read() | Wire.read() << 8;
 	rawAcc[1] = Wire.read() | Wire.read() << 8;
 	rawAcc[2] = Wire.read() | Wire.read() << 8;
@@ -439,7 +504,8 @@ void calibrate()
 		accOffsetX += rawAcc[0];
 		accOffsetY += rawAcc[1];
 		accOffsetZ += (rawAcc[2] - getAccLSB());
-		delay(3);                      // Забавяне от 3 микро секунди.
+		// Забавяне от 3 микро секунди.
+		delay(3);
 	}
 
 	display.update();
@@ -535,13 +601,15 @@ void refresh()
 	updateDisplay();
 }
 
-// Изчисляване на показанията на акселерометъра в g. Обхвата се взема в предвид.
+// Изчисляване на показанията на акселерометъра в g.
+// Обхвата се взема в предвид.
 double rawToRealAcc(int16_t value)
 {
 	return (double)value / getAccLSB();
 }
 
-// Изчисляване на показанията на жироскопа в deg/s. Обхвата се взема в предвид.
+// Изчисляване на показанията на жироскопа в deg/s.
+// Обхвата се взема в предвид.
 double rawToRealGyro(int16_t value)
 {
 	return (double)value / getGyroLSB();
@@ -553,7 +621,6 @@ double rawToRealGyro(int16_t value)
 // "2" - Смяна на обхвата на сензора
 // "3" - Преминаване на връзка към PC или обратно
 // "4" - Смяна на режима на работа
-
 void readButtons()
 {
 	char key = keypad.getKey();
@@ -577,6 +644,7 @@ void readButtons()
 		break;
 	}
 }
+
 // Смяна на режима на работа
 void changeMode()
 {
@@ -632,19 +700,19 @@ void sendData()
 		updateDisplay();
 	}
 
-	Serial.print(interval);  //microseconds since last sample, monitor this value to be < 10000, increase bitrate to print faster
+	Serial.print(interval); 
 	Serial.print(F(","));
-	Serial.print(RwAcc[0]);  //Inclination X axis (as measured by accelerometer)
+	Serial.print(RwAcc[0]); 
 	Serial.print(F(","));
-	Serial.print(RwEst[0]);  //Inclination X axis (estimated / filtered)
+	Serial.print(RwEst[0]); 
 	Serial.print(F(","));
-	Serial.print(RwAcc[1]);  //Inclination Y axis (as measured by accelerometer)
+	Serial.print(RwAcc[1]); 
 	Serial.print(F(","));
-	Serial.print(RwEst[1]);  //Inclination Y axis (estimated / filtered)
+	Serial.print(RwEst[1]); 
 	Serial.print(F(","));
-	Serial.print(RwAcc[2]);  //Inclination Z axis (as measured by accelerometer)
+	Serial.print(RwAcc[2]); 
 	Serial.print(F(","));
-	Serial.print(RwEst[2]);  //Inclination Z axis (estimated / filtered)  
+	Serial.print(RwEst[2]); 
 	Serial.println(F(""));
 }
 
