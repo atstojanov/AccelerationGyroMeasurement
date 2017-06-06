@@ -656,6 +656,10 @@ void changeMode()
 	{
 		mode++;
 	}
+	if (pcConnection && mode == 1)
+	{
+		mode++;
+	}
 	reset();
 
 	if (mode == 0 || mode == 2)
